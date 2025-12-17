@@ -1,0 +1,158 @@
+enum Role {
+  USER
+  ADMIN
+  APPROVER
+}
+
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+/**
+ * MODELS
+ */
+
+model Payee {
+  id        Int      @id @default(autoincrement())
+  name      String
+  address   String?
+  type      String?  @default("supplier")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  disbursements Disbursement[]
+
+  @@map("payees") // Table name
+}
+
+model FundSource {
+  id             Int      @id @default(autoincrement())
+  code           String   @unique
+  name           String
+  initialBalance Decimal  @default("0") @db.Decimal(15, 2)
+  description    String?  @db.Text
+  isActive       Boolean  @default(true) @map("is_active")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  disbursements Disbursement[]
+
+  @@map("fund_sources")
+}
+
+model Disbursement {
+  id Int @id @default(autoincrement())
+
+  // Foreign Key
+  payeeId      Int? @map("payee_id")
+  fundSourceId Int? @map("fund_source_id")
+
+  // Documents References 
+  lddapNum String? @map("lddap_num")
+  acicNum  String? @map("acic_num")
+  orsNum   String? @map("ors_num")
+  dvNum    String? @map("dv_num")
+  uacsCode String? @map("uacs_code")
+  respCode String? @map("resp_code")
+
+  // Dates
+  dateReceived DateTime? @map("date_received")
+  dateEntered  DateTime  @default(now()) @map("date_entered")
+
+  // Financials 
+  grossAmount     Decimal @map("gross_amount") @db.Decimal(15, 2)
+  totalDeductions Decimal @default(0) @map("total_deductions") @db.Decimal(15, 2)
+  netAmount       Decimal @map("net_amount") @db.Decimal(15, 2)
+
+  // Details
+  particulars String?   @db.Text
+  method      String // "Manual" or "online"
+  status      String    @default("pending")
+  approvedAt  DateTime? @map("approved_at")
+
+  // Standard Timestamps
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Soft Deletes
+  deletedAt DateTime? @map("deleted_at")
+
+  // Relations
+  payee      Payee?                   @relation(fields: [payeeId], references: [id])
+  fundSource FundSource?              @relation(fields: [fundSourceId], references: [id])
+  items      DisbursementItem[]
+  deductions DisbursementDeductions[]
+
+  // Indexes
+  @@index([lddapNum])
+  @@index([acicNum])
+  @@index([orsNum])
+  @@index([dvNum])
+  @@index([uacsCode])
+  @@index([respCode])
+  @@index([method])
+  @@index([status])
+  @@map("disbursements")
+}
+
+model DisbursementItem {
+  id Int @id @default(autoincrement())
+
+  // Foreign key
+  disbursementId Int?     @map("disbursement_id")
+  description    String
+  accountCode    String?  @map("account_code")
+  amount         Decimal  @db.Decimal(15, 2)
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  disbursement Disbursement? @relation(fields: [disbursementId], references: [id])
+
+  @@map("disbursement_items")
+}
+
+model DisbursementDeductions {
+  id Int @id @default(autoincrement())
+
+  // Foreign Key
+  disbursemenId Int @map("disbursement_id")
+
+  deductionType String   @map("deduction_type")
+  amount        Decimal  @db.Decimal(15, 2)
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  disbursement Disbursement @relation(fields: [disbursemenId], references: [id])
+
+  @@map("disbursement_deductions")
+}
+
+model User {
+  id        Int     @id @default(autoincrement())
+  username  String? @map("username")
+  firstName String  @map("first_name")
+  lastName  String  @map("last_name")
+  email     String  @unique
+  password  String
+  role      Role    @default(USER)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("users")
+}

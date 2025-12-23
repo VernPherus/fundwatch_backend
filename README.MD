@@ -1,5 +1,13 @@
 # FUNDWATCH 
 
+*Always know where the money goes*
+
 ## PROJECT SETUP
 
--- insert instructions here
+Setup instructions after project cloning
+
+CMD: 
+
+```
+npm install
+```

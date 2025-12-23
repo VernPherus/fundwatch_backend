@@ -14,9 +14,9 @@ npm install
 
 ### Prisma Setup:
 
-* Generate prisma files
+* Migrate prisma
 ```
-npx prisma init --datasource-provider postgresql --output ../generated/prisma
+npx prisma migrate dev
 ```
 
 * Introspect the database

@@ -48,3 +48,9 @@ npx prisma migrate resolve --applied 0_init
 ```
 npx prisma generate
 ```
+
+### Prisma studio:
+
+```
+npx prisma studio --config ./prisma.config.ts
+```

@@ -4,6 +4,7 @@ import {
   login,
   logout,
   showUsers,
+  grantAdmin,
 } from "../controllers/auth.controller.js";
 
 const router = express.Router();
@@ -15,6 +16,7 @@ const router = express.Router();
 router.post("/signup", signup);
 router.post("/login", login);
 router.post("/logout", logout);
-router.post("/showUsers", showUsers);
+router.get("/showUsers", showUsers);
+router.put("/grantAdmin", grantAdmin);
 
 export default router;

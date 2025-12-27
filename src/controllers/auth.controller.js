@@ -78,8 +78,35 @@ export const signup = async (req, res) => {
  * @param {*} req
  * @param {*} res
  */
-export const login = (req, res) => {
-  
+export const login = async (req, res) => {
+  const { email, password } = req.body;
+
+  try {
+    //* Check if user exists
+    const user = await prisma.user.findUnique({ where: { email } });
+
+    if (!user) {
+      return res.status(400).json({ message: "Invalid credentials." });
+    }
+
+    //* Check for password
+    const isPasswordCorrect = await bcrypt.compare(password, user.password);
+
+    if (!isPasswordCorrect) {
+      return res.status(400).json({ message: "Invalid credentials." });
+    }
+
+    generateToken(user.id, res);
+
+    res.status(200).json({
+      id: user.id,
+      username: user.username,
+      email: user.email,
+    });
+  } catch (error) {
+    console.log("Error in login controller: " + error.message);
+    res.status(500).json({ message: "Internal server error." });
+  }
 };
 
 /**
@@ -88,7 +115,13 @@ export const login = (req, res) => {
  * @param {*} res
  */
 export const logout = (req, res) => {
-  res.send("logout route");
+  try {
+    res.cookie("jwt", "", { maxAge: 0 });
+    res.status(200).json({ message: "Logged out successfully" });
+  } catch (error) {
+    console.log("Error in the logout controller: ", error.message);
+    res.status(500).json({ message: "Internal server error" });
+  }
 };
 
 /**
@@ -110,12 +143,10 @@ export const showUsers = async (req, res) => {
 
 /**
  * GRANT ADMIN: Updates user role to admin
- * @param {*} req 
- * @param {*} res 
+ * @param {*} req
+ * @param {*} res
  */
-export const grantAdmin = async (req, res) => {
-  
-}
+export const grantAdmin = async (req, res) => {};
 
 /**
  * CHECK AUTH: Checks if current user is authenticated

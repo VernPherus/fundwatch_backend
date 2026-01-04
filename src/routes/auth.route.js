@@ -11,7 +11,7 @@ import { protectRoute } from "../middleware/auth.middleware.js";
 const router = express.Router();
 
 /**
- ** User authentication routes
+ * * AUTHENTICATION ROUTES
  */
 
 router.post("/signup", signup);

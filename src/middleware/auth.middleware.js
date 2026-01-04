@@ -1,6 +1,8 @@
 import jwt from "jsonwebtoken";
 import { prisma } from "../lib/prisma.js";
 
+// TODO: Add role access function
+
 export const protectRoute = async (res, req, next) => {
   try {
     //* Check if token exists

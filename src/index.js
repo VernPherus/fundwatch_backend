@@ -3,6 +3,7 @@ import dotenv from "dotenv";
 import cookieParser from "cookie-parser";
 
 import authRoutes from "./routes/auth.route.js";
+import fundRoutes from "./routes/fund.route.js";
 
 dotenv.config();
 
@@ -18,6 +19,11 @@ app.use(cookieParser());
 
 //* ROUTES
 app.use("/api/auth", authRoutes);
+app.use("/api/fund", fundRoutes);
+app.use("/api/diplayFund", fundRoutes);
+app.use("/api/showFund", fundRoutes);
+app.use("/api/editFund", fundRoutes);
+app.use("/api/deactivateFund", fundRoutes);
 
 app.listen(PORT, () => {
   console.log("server is running on port: " + PORT);

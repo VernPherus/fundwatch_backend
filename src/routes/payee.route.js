@@ -3,7 +3,7 @@ import express from "express";
 const router = express.Router();
 
 /**
- * * DISBURSEMENT ROUTES
+ * * PAYEE ROUTES
  */
 
 export default router;

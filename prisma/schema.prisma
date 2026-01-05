@@ -10,7 +10,7 @@ datasource db {
 model Payee {
   id            Int            @id @default(autoincrement())
   name          String
-  address       String?
+  address       String?        @map("address")
   type          String?        @default("supplier")
   createdAt     DateTime       @default(now()) @map("created_at")
   updatedAt     DateTime       @updatedAt @map("updated_at")
@@ -55,6 +55,7 @@ model Disbursement {
   createdAt       DateTime                 @default(now()) @map("created_at")
   updatedAt       DateTime                 @updatedAt @map("updated_at")
   deletedAt       DateTime?                @map("deleted_at")
+  ageLimit        Int                      @default(5)
   deductions      DisbursementDeductions[]
   items           DisbursementItem[]
   fundSource      FundSource?              @relation(fields: [fundSourceId], references: [id])
@@ -106,8 +107,20 @@ model User {
   role      Role     @default(USER)
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
+  logs      Logs[]
 
   @@map("users")
+}
+
+model Logs {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @map("user_id")
+  log       String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("logs")
 }
 
 enum Role {

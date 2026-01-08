@@ -12,6 +12,16 @@ model Payee {
   name          String
   address       String?        @map("address")
   type          String?        @default("supplier")
+  tinNum        String?        @map("tin_number")
+  bankName      String?        @map("bank_name")
+  bankBranch    String?        @map("bank_branch")
+  accountName   String?        @map("account_name")
+  accountNumber String?        @map("account_number")
+  contactPerson String?        @map("contact_person")
+  mobileNum     String?        @map("mobile_number")
+  email         String?        @map("email")
+  isActive      Boolean        @default(true) @map("is_active")
+  remarks       String?        @db.Text
   createdAt     DateTime       @default(now()) @map("created_at")
   updatedAt     DateTime       @updatedAt @map("updated_at")
   disbursements Disbursement[]
@@ -126,5 +136,5 @@ model Logs {
 enum Role {
   USER
   ADMIN
-  APPROVER
+  STAFF @map("APPROVER")
 }

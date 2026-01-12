@@ -223,7 +223,117 @@ export const showRec = async (req, res) => {
  * @returns
  */
 export const editRec = async (req, res) => {
-  try { 
+  const { id } = req.params;
+  const {
+    //* References (The most common edits)
+    payeeId,
+    fundSourceId,
+    lddapNum,
+    orsNum,
+    dvNum,
+    uacsCode,
+    respCode,
+    particulars,
+    method,
+    dateReceived,
+    ageLimit,
+
+    //* Financials (Optional - only if correcting amounts)
+    items,
+    deductions,
+  } = req.body;
+
+  try {
+    //* Validation
+    const currentRecord = await prisma.disbursement.findUnique({
+      where: { id: Number(id) },
+      include: { items: true, deductions: true },
+    });
+
+    if (!currentRecord) {
+      return res.status(404).json({ message: "Disbursement not found." });
+    }
+
+    //* Prevent editing if already approved/released
+    if (currentRecord.status !== "pending") {
+      return res.status(403).json({
+        message: `Cannot edit record. Current status is ${currentRecord.status}.`,
+      });
+    }
+
+    //* Prepare update object
+    const updateData = {
+      payeeId: payeeId ? Number(payeeId) : undefined,
+      fundSourceId: fundSourceId ? Number(fundSourceId) : undefined,
+      lddapNum,
+      orsNum,
+      dvNum,
+      uacsCode,
+      respCode,
+      particulars,
+      method,
+      ageLimit: ageLimit ? Number(ageLimit) : undefined,
+      dateReceived: dateReceived ? new Date(dateReceived) : undefined,
+    };
+
+    //* Recalculations
+    let newGross = Number(currentRecord.grossAmount);
+    let newTotalDeductions = Number(currentRecord.totalDeductions);
+
+    //* Handle items
+    if (items && Array.isArray(items)) {
+      // Calculate new Gross from the INCOMING items
+      newGross = items.reduce((sum, item) => sum + Number(item.amount), 0);
+
+      // Add Prisma instruction to replace items
+      updateData.items = {
+        deleteMany: {}, // Remove ALL old items for this ID
+        create: items.map((item) => ({
+          description: item.description,
+          accountCode: item.accountCode,
+          amount: Number(item.amount),
+        })),
+      };
+
+      updateData.grossAmount = newGross;
+    }
+
+    //* Handle deductions
+    if (deductions && Array.isArray(deductions)) {
+      // Calculate new Deductions from the INCOMING array
+      newTotalDeductions = deductions.reduce(
+        (sum, ded) => sum + Number(ded.amount),
+        0
+      );
+
+      // Add Prisma instruction to replace deductions
+      updateData.deductions = {
+        deleteMany: {}, // Remove ALL old deductions
+        create: deductions.map((ded) => ({
+          deductionType: ded.deductionType,
+          amount: Number(ded.amount),
+        })),
+      };
+
+      updateData.totalDeductions = newTotalDeductions;
+    }
+
+    //* Recalculation
+    if (items || deductions) {
+      updateData.netAmount = newGross - newTotalDeductions;
+    }
+
+    //* Execute update
+    const updatedRecord = await prisma.disbursement.update({
+      where: { id: Number(id) },
+      data: updateData,
+      include: {
+        items: true,
+        deductions: true,
+      },
+    });
+
+    res.status(200).json(updatedRecord);
   } catch (error) {
     console.log("Error in editRec controller: ", error.message);
     res.status(500).json({ message: "Internal server error." });
@@ -237,7 +347,44 @@ export const editRec = async (req, res) => {
  * @returns
  */
 export const approveRec = async (req, res) => {
-  return res.status(200).json({ message: "Show  Disbursement" });
+  //TODO: Add logs
+  const { id } = req.params;
+
+  try {
+    //* Validation
+    if (!id) {
+      return res.status(400).json({ message: "Disbursement ID is required." });
+    }
+
+    //* Check status
+    const record = await prisma.disbursement.findUnique({
+      where: { id: Number(id) },
+    });
+
+    if (!record) {
+      return res.status(404).json({ message: "Disbursement not found." });
+    }
+
+    //* Status check
+    if (record.status === "approved") {
+      return res.status(409).json({ message: "Record is already approved" });
+    }
+
+    //* Approve
+    const approvedRecord = await prisma.disbursement.update({
+      where: { id: Number(id) },
+      data: { status: "approved", approvedAt: new Date() },
+    });
+
+    //* Return
+    res.status(200).json({
+      message: "Disbursement approved successfully.",
+      data: approvedRecord,
+    });
+  } catch (error) {
+    console.log("Error in approveRec controller: ", error.message);
+    res.status(500).json({ message: "Internal server error" });
+  }
 };
 
 /**

@@ -59,7 +59,7 @@ model Disbursement {
   totalDeductions Decimal                  @default(0) @map("total_deductions") @db.Decimal(15, 2)
   netAmount       Decimal                  @map("net_amount") @db.Decimal(15, 2)
   particulars     String?
-  method          String
+  method          Method                   @default(MANUAL)
   status          String                   @default("pending")
   approvedAt      DateTime?                @map("approved_at")
   createdAt       DateTime                 @default(now()) @map("created_at")
@@ -137,4 +137,9 @@ enum Role {
   USER
   ADMIN
   STAFF @map("APPROVER")
+}
+
+enum Method {
+  ONLINE
+  MANUAL
 }

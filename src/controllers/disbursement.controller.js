@@ -1,58 +1,250 @@
+import { prisma } from "../lib/prisma.js";
+
 /**
- * * STORE RECORD: 
- * @param {*} req 
- * @param {*} res 
- * @returns 
+ * * STORE RECORD:
+ * @param {*} req
+ * @param {*} res
+ * @returns
  */
 export const storeRec = async (req, res) => {
-  return res.status(200).json({ message: "Store Disbursement" });
+  // TODO: Add user logging
+
+  const {
+    //* References
+    payeeId,
+    fundsourceId,
+
+    //* Documents
+    lddapNum,
+    orsNum,
+    dvNum,
+    uacsCode,
+    respCode,
+
+    //* Time
+    dateReceived,
+
+    //* Financial
+    grossAmount,
+
+    //* Details
+    particulars,
+    method,
+    ageLimit,
+
+    //* Items
+    items = [],
+    deductions = [],
+  } = req.body;
+
+  try {
+    //* Validation
+    if (!payeeId || !fundsourceId) {
+      return res
+        .status(400)
+        .json({ message: "Payee and Fund Source are required." });
+    }
+
+    if (!grossAmount) {
+      return res.status(400).json({ message: "Gross amount requried" });
+    }
+
+    if (!method) {
+      return res
+        .status(400)
+        .json({ message: "Disbursement method is required." });
+    }
+
+    //* Calculations
+    // Sum up items for Gross Amount
+    const calculatedGross = items.reduce((sum, item) => {
+      return sum + Number(item.amount || 0);
+    }, 0);
+
+    // Sum up deductions
+    const calculatedDeductions = deductions.reduce((sum, ded) => {
+      return sum + Number(ded.amount || 0);
+    }, 0);
+
+    //* Create disbursement
+    const newDisbursement = await prisma.disbursement.create({
+      data: {
+        // FKs
+        payeeId: Number(payeeId),
+        fundSourceId: Number(fundsourceId),
+
+        // Document Details
+        lddapNum,
+        orsNum,
+        dvNum,
+        uacsCode,
+        respCode,
+        particulars,
+        method,
+        ageLimit: ageLimit ? Number(ageLimit) : 5,
+        dateReceived: dateReceived ? new Date(dateReceived) : null,
+
+        // Financials (Calculated above)
+        grossAmount: calculatedGross,
+        totalDeductions: calculatedDeductions,
+        netAmount: calculatedNet,
+
+        // NESTED WRITES: Create relations automatically
+        items: {
+          create: items.map((item) => ({
+            description: item.description,
+            accountCode: item.accountCode,
+            amount: Number(item.amount),
+          })),
+        },
+        deductions: {
+          create: deductions.map((ded) => ({
+            deductionType: ded.deductionType,
+            amount: Number(ded.amount),
+          })),
+        },
+      },
+      include: {
+        items: true,
+        deductions: true,
+      },
+    });
+
+    res.status(201).json(newDisbursement);
+  } catch (error) {
+    console.log("Error in the storeRec controller: ", error.message);
+    res.status(500).json({ message: "Internal server error." });
+  }
 };
 
 /**
  * * DISPLAY RECORD: Display disbursement records for dashboard
- * @param {*} req 
- * @param {*} res 
- * @returns 
+ * Shows disbursement date received, payee, fund, net amount, and status
+ * @param {*} req
+ * @param {*} res
+ * @returns
  */
 export const displayRec = async (req, res) => {
-    return res.status(200).json({message: "Display Disbursement"})
-}
+  const page = Number(req.query.page) || 1;
+  const limit = Number(req.query.limit) || 10;
+  const skip = (page - 1) * limit;
+
+  try {
+    //* Get disbursement records
+
+    const [totalRecords, records] = await prisma.$transaction([
+      prisma.disbursement.count(),
+      prisma.disbursement.findMany({
+        skip: skip,
+        limit: limit,
+        orderBy: {
+          dateReceived: `desc`,
+        },
+        select: {
+          id: true,
+          dateReceived: true,
+          netAmount: true,
+          status: true,
+
+          payee: {
+            select: {
+              name: true,
+            },
+          },
+          fundSource: {
+            select: {
+              code: true,
+              name: true,
+            },
+          },
+        },
+      }),
+    ]);
+
+    res.status(200).json({
+      data: records,
+      pagination: {
+        totalRecords,
+        currentPage: page,
+        totalPages: Math.ceil(totalRecords / limit),
+        limit,
+      },
+    });
+  } catch (error) {
+    console.log("Error in the displayRec controller: ", error.message);
+    res.status(500).json({ message: "Internal server error." });
+  }
+};
 
 /**
- * * SHOW RECORD: Show all data in one disbursement
- * @param {*} req 
- * @param {*} res 
- * @returns 
+ * * SHOW RECORD: Show all data in one disbursement, accessed by view disbursement function in dashboard.
+ * @param {*} req
+ * @param {*} res
+ * @returns
  */
 export const showRec = async (req, res) => {
-  return res.status(200).json({ message: "Show Disbursement" });
+  const { id } = req.params;
+
+  try {
+    //* Validation
+    if (!id) {
+      return res.status(400).json({ message: "Disbursement ID is required." });
+    }
+
+    //* Get record
+    const record = await prisma.disbursement.findUnique({
+      where: {
+        id: Number(id),
+      },
+      include: {
+        items: true,
+        deductions: true,
+        payee: true,
+        fundSource: { select: { code: true, name: true, description: true } },
+      },
+    });
+
+    //* Handle non-existent records
+    if (!record) {
+      return res.status(404).json({ messaage: "Record not found." });
+    }
+
+    res.status(200).json(record);
+  } catch (error) {
+    console.log("Error in showRec controller: ", error.message);
+    res.status(500).json({ message: "Internal server error." });
+  }
 };
 
 /**
  * * EDIT RECORD: Edit a record's reference codes, fund source and payee
- * @param {*} req 
- * @param {*} res 
- * @returns 
+ * @param {*} req
+ * @param {*} res
+ * @returns
  */
 export const editRec = async (req, res) => {
-  return res.status(200).json({ message: "Edid  Disbursement" });
+  try { 
+  } catch (error) {
+    console.log("Error in editRec controller: ", error.message);
+    res.status(500).json({ message: "Internal server error." });
+  }
 };
 
 /**
  * * APPROVE RECORD
- * @param {*} req 
- * @param {*} res 
- * @returns 
+ * @param {*} req
+ * @param {*} res
+ * @returns
  */
 export const approveRec = async (req, res) => {
   return res.status(200).json({ message: "Show  Disbursement" });
 };
 
 /**
- * * REMOVE RECORD: 
- * @param {*} req 
- * @param {*} res 
- * @returns 
+ * * REMOVE RECORD:
+ * @param {*} req
+ * @param {*} res
+ * @returns
  */
 export const removeRec = async (req, res) => {
   return res.status(200).json({ message: "Show  Disbursement" });

@@ -12,6 +12,11 @@ const router = express.Router();
 
 /**
  * * PAYEE ROUTES
+ * ACCESS ROLES: USER, STAFF, ADMIN
+ */
+
+/**
+ * * ACCESS: STAFF AND ADMIN
  */
 router.post("/newPayee", protectRoute, newPayee);
 

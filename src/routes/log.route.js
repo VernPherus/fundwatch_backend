@@ -6,6 +6,11 @@ const router = express.Router();
 
 /**
  * * LOG ROUTES
+ * ACCESS ROLES: USER, STAFF, ADMIN
+ */
+
+/**
+ * * ACCESS: ADMIN 
  */
 
 router.get('/get', protectRoute, getSystemLogs);

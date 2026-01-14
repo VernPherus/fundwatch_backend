@@ -12,13 +12,23 @@ const router = express.Router();
 
 /**
  * * AUTHENTICATION ROUTES
+ * ACCESS ROLES: USER, STAFF, ADMIN
  */
 
-router.post("/signup", signup);
+/**
+ * * ACCESS: ALL
+ */
 router.post("/login", login);
 router.post("/logout", logout);
 
+
+/**
+ * * ACCESS: ADMIN ONLY
+ */
+router.post("/signup", signup);
+
 router.get("/showUsers", protectRoute, authorize(["ADMIN"]), showUsers);
+
 router.put("/grantAdmin", protectRoute, authorize(["ADMIN"]), grantAdmin);
 
 export default router;

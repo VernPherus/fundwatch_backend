@@ -1,3 +1,5 @@
+import { prisma } from "../lib/prisma.js";
+
 /**
  * * NEW PAYEE: Create payee source
  * @param {*} req
@@ -5,41 +7,167 @@
  * @returns
  */
 export const newPayee = async (req, res) => {
-  return res.status(200).json({ message: "Created new payee source" });
+  // TODO: Add user logs
+  const {
+    name,
+    address,
+    type,
+    tinNum,
+    bankName,
+    bankBranch,
+    accountName,
+    accountNumber,
+    contactPerson,
+    mobileNum,
+    email,
+    remarks,
+  } = req.body;
+
+  try {
+    //* Validation
+    if (!name) {
+      res.status(400).json("Payee name is required.");
+    }
+
+    //* Check for duplications
+    const existingPayee = await prisma.payee.findFirst({
+      where: { name: name },
+    });
+
+    if (existingPayee) {
+      return res
+        .status(409)
+        .json({ message: "A payee with this name already exists" });
+    }
+
+    //* Create payee
+    const savedPayee = await prisma.payee.create({
+      data: {
+        name,
+        address,
+        type: type || "supplier",
+        tinNum,
+        bankName,
+        bankBranch,
+        accountName,
+        accountNumber,
+        contactPerson,
+        mobileNumber: mobileNum,
+        email,
+        remarks,
+      },
+    });
+
+    res.status(201).json({ message: "New payee created", savedPayee });
+  } catch (error) {
+    console.log("Error in newPayee controller: " + error.message);
+    res.status(500).json({ message: "Internal server error." });
+  }
 };
 
 /**
- * * DISPLAY PAYEE:
+ * * LIST PAYEE: Displays payee for disbursement form
  * @param {*} req
  * @param {*} res
  * @returns
  */
-export const displayPayee = async (req, res) => {
+export const listPayee = async (req, res) => {
+  try {
+    // TODO: Add pagination
+    // Get payee:
+    const payees = await prisma.payee.findMany();
+
+    res.status(200).json(payees);
+  } catch (error) {
+    console.log("Error in displayPayee controller: ", error.message);
+    res.status(500).json({ message: "Internal server error." });
+  }
+
   return res.status(200).json({ message: "Display payees for dashboard" });
 };
 
 /**
- * * SHOW PAYEE:
+ * * SHOW PAYEE: Displays details for payee
  * @param {*} req
  * @param {*} res
  * @returns
  */
 export const showPayee = async (req, res) => {
-  return res.status(200).json({ message: "Show payees" });
+  const { id: payeeID } = req.params;
+  try {
+    const payee = await prisma.payee.findUnique({
+      where: {
+        id: payeeID,
+      },
+    });
+
+    res.status(200).json({ payee });
+  } catch (error) {
+    console.log("Error in showPayee controller: " + error.message);
+    res.status(500).json({ message: "Internal server error." });
+  }
 };
 
 /**
- * * EDIT PAYEE:
+ * * EDIT PAYEE: Edit all payee details
  * @param {*} req
  * @param {*} res
  * @returns
  */
 export const editPayee = async (req, res) => {
-  return res.status(200).json({ message: "Edit payees" });
+  const { id } = req.params;
+  const {
+    name,
+    address,
+    type,
+    tinNum,
+    bankName,
+    bankBranch,
+    accountName,
+    accountNumber,
+    contactPerson,
+    mobileNum,
+    email,
+    remarks,
+    isActive,
+  } = req.body;
+
+  try {
+    //* Validation
+    if (!id) {
+      return res.status(400).json({ message: "Payee ID is required." });
+    }
+
+    const updatedPayee = await prisma.payee.update({
+      where: {
+        id: Number(id),
+      },
+      data: {
+        name,
+        address,
+        type,
+        tinNum,
+        bankName,
+        bankBranch,
+        accountName,
+        accountNumber,
+        contactPerson,
+        mobileNumber: mobileNum,
+        email,
+        remarks,
+        isActive,
+      },
+    });
+
+    res.status(200).json({ updatedPayee });
+  } catch (error) {
+    console.log("Error in the editPayee controller: ", error.message);
+    res.status(500).json({ message: "Internal server error." });
+  }
 };
 
 /**
- * * REMOVE PAYEE:
+ * * REMOVE PAYEE: Deactivates the active status of the payee
  * @param {*} req
  * @param {*} res
  * @returns

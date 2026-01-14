@@ -1,18 +1,24 @@
 import express from "express";
-import{newFund} from "../controllers/fund.controller.js";
-import{displayFund} from "../controllers/fund.controller.js";
-import { showFund } from "../controllers/fund.controller.js";
-import { editFund } from "../controllers/fund.controller.js";
-import { deactivateFund } from "../controllers/fund.controller.js";
+import {
+  newFund,
+  displayFund,
+  showFund,
+  editFund,
+  deactivateFund,
+} from "../controllers/fund.controller.js";
+import { protectRoute } from "../middleware/auth.middleware.js";
 
 const router = express.Router();
 
 /**
  * * FUND ROUTES
  */
-router.get("/newfund",newFund);
-router.get("/displayfund", displayFund);
-router.get("/showfund", showFund);
-router.get("/editfund", editFund);
-router.get("/deactivatefund", deactivateFund);
+router.post("/newfund", protectRoute, newFund);
+
+router.get("/displayfund", protectRoute, displayFund);
+router.get("/showfund", protectRoute, showFund);
+
+router.put("/editfund", protectRoute, editFund);
+//router.put("/deactivatefund", deactivateFund);
+
 export default router;

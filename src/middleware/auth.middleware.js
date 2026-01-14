@@ -1,7 +1,7 @@
 import jwt from "jsonwebtoken";
 import { prisma } from "../lib/prisma.js";
 
-export const protectRoute = async (res, req, next) => {
+export const protectRoute = async (req, res, next) => {
   try {
     //* Check if token exists
     const token = req.cookies.jwt;

@@ -4,7 +4,7 @@ import cookieParser from "cookie-parser";
 
 import authRoutes from "./routes/auth.route.js";
 import fundRoutes from "./routes/fund.route.js";
-import logRoutes from "./controllers/log.controller.js";
+import logRoutes from "./routes/log.route.js";
 
 dotenv.config();
 

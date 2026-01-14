@@ -8,6 +8,6 @@ const router = express.Router();
  * * LOG ROUTES
  */
 
-router.get(protectRoute, getSystemLogs);
+router.get('/get', protectRoute, getSystemLogs);
 
 export default router;

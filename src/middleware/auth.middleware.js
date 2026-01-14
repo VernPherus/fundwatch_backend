@@ -1,9 +1,7 @@
 import jwt from "jsonwebtoken";
 import { prisma } from "../lib/prisma.js";
 
-// TODO: Add role access function
-
-export const protectRoute = async (res, req, next) => {
+export const protectRoute = async (req, res, next) => {
   try {
     //* Check if token exists
     const token = req.cookies.jwt;
@@ -20,6 +18,7 @@ export const protectRoute = async (res, req, next) => {
     //* Check if user exists
     const user = await prisma.user.findUnique({
       where: { id: decodedToken.id },
+      select: { id: true, role: true, name: true },
     });
 
     if (!user) {
@@ -30,6 +29,26 @@ export const protectRoute = async (res, req, next) => {
     next();
   } catch (error) {
     console.log("Error in protectedRoute middleware: " + error.message);
-    req.status(500).json({ message: "Internal server error." });
+    res.status(500).json({ message: "Internal server error." });
   }
+};
+
+export const authorize = (allowedRoles = []) => {
+  return (req, res, next) => {
+    if (!req.user) {
+      return res
+        .status(401)
+        .json({ message: "Unauthorized - User not identified." });
+    }
+
+    //* Check if allowed roles are included
+    if (!allowedRoles.includes(req.user.role)) {
+      return res.status(403).json({
+        message:
+          "Forbidden - You do not have permission to perform this action",
+      });
+    }
+
+    next();
+  };
 };

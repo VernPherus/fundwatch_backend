@@ -18,6 +18,6 @@ router.post("/newPayee", protectRoute, newPayee);
 router.get("/listPayee", protectRoute, listPayee);
 router.get("/showPayee/:id", protectRoute, showPayee);
 
-router.put("/editPayee", protectedRoute, editPayee);
+router.put("/editPayee", protectRoute, editPayee);
 
 export default router;

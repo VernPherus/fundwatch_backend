@@ -20,10 +20,6 @@ app.use(cookieParser());
 //* ROUTES
 app.use("/api/auth", authRoutes);
 app.use("/api/fund", fundRoutes);
-app.use("/api/diplayFund", fundRoutes);
-app.use("/api/showFund", fundRoutes);
-app.use("/api/editFund", fundRoutes);
-app.use("/api/deactivateFund", fundRoutes);
 
 app.listen(PORT, () => {
   console.log("server is running on port: " + PORT);

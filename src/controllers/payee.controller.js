@@ -19,6 +19,7 @@ export const newPayee = async (req, res) => {
     accountNumber,
     contactPerson,
     mobileNum,
+    mobileNumber, // Frontend may send this
     email,
     remarks,
   } = req.body;
@@ -26,7 +27,7 @@ export const newPayee = async (req, res) => {
   try {
     //* Validation
     if (!name) {
-      res.status(400).json("Payee name is required.");
+      return res.status(400).json({ message: "Payee name is required." });
     }
 
     //* Check for duplications
@@ -44,17 +45,17 @@ export const newPayee = async (req, res) => {
     const savedPayee = await prisma.payee.create({
       data: {
         name,
-        address,
+        address: address || null,
         type: type || "supplier",
-        tinNum,
-        bankName,
-        bankBranch,
-        accountName,
-        accountNumber,
-        contactPerson,
-        mobileNumber: mobileNum,
-        email,
-        remarks,
+        tinNum: tinNum || null,
+        bankName: bankName || null,
+        bankBranch: bankBranch || null,
+        accountName: accountName || null,
+        accountNumber: accountNumber || null,
+        contactPerson: contactPerson || null,
+        mobileNum: mobileNum || mobileNumber || null,
+        email: email || null,
+        remarks: remarks || null,
       },
     });
 
@@ -82,8 +83,6 @@ export const listPayee = async (req, res) => {
     console.log("Error in displayPayee controller: ", error.message);
     res.status(500).json({ message: "Internal server error." });
   }
-
-  return res.status(200).json({ message: "Display payees for dashboard" });
 };
 
 /**

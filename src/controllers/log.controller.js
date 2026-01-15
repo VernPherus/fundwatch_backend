@@ -6,8 +6,8 @@ import { prisma } from "../lib/prisma.js";
  * @param {*} res
  */
 export const getSystemLogs = async (req, res) => {
-  const page = Number;
-  const limit = 20;
+  const page = Number(req.query.page) || 1;
+  const limit = Number(req.query.limit) || 20;
   const skip = (page - 1) * limit;
 
   try {

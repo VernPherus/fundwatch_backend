@@ -136,9 +136,9 @@ export const displayRec = async (req, res) => {
       prisma.disbursement.count(),
       prisma.disbursement.findMany({
         skip: skip,
-        limit: limit,
+        take: limit,
         orderBy: {
-          dateReceived: `desc`,
+          dateReceived: "desc",
         },
         select: {
           id: true,

@@ -146,11 +146,36 @@ export const showUsers = async (req, res) => {
  * @param {*} req
  * @param {*} res
  */
-export const grantAdmin = async (req, res) => {};
+export const grantAdmin = async (req, res) => { };
 
 /**
  * CHECK AUTH: Checks if current user is authenticated
  * @param {*} req
  * @param {*} res
  */
-export const checkAuth = async (req, res) => {};
+export const checkAuth = async (req, res) => {
+  try {
+    // req.user is set by the protectRoute middleware
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.id },
+      select: {
+        id: true,
+        username: true,
+        firstName: true,
+        lastName: true,
+        email: true,
+        role: true,
+        createdAt: true,
+      },
+    });
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.status(200).json(user);
+  } catch (error) {
+    console.log("Error in checkAuth controller: " + error.message);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};

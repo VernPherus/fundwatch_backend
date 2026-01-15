@@ -66,6 +66,9 @@ export const storeRec = async (req, res) => {
       return sum + Number(ded.amount || 0);
     }, 0);
 
+    // Calculate net amount
+    const calculatedNet = calculatedGross - calculatedDeductions;
+
     //* Create disbursement
     const newDisbursement = await prisma.disbursement.create({
       data: {
@@ -347,8 +350,9 @@ export const editRec = async (req, res) => {
  * @returns
  */
 export const approveRec = async (req, res) => {
-  //TODO: Add logs
   const { id } = req.params;
+  const { remarks } = req.body;
+  const userId = req.user?.id;
 
   try {
     //* Validation
@@ -356,9 +360,13 @@ export const approveRec = async (req, res) => {
       return res.status(400).json({ message: "Disbursement ID is required." });
     }
 
-    //* Check status
+    //* Check status and get record details for logging
     const record = await prisma.disbursement.findUnique({
       where: { id: Number(id) },
+      include: {
+        payee: { select: { name: true } },
+        fundSource: { select: { code: true, name: true } },
+      },
     });
 
     if (!record) {
@@ -367,19 +375,45 @@ export const approveRec = async (req, res) => {
 
     //* Status check
     if (record.status === "approved") {
-      return res.status(409).json({ message: "Record is already approved" });
+      return res.status(409).json({ message: "Record is already approved." });
     }
 
-    //* Approve
-    const approvedRecord = await prisma.disbursement.update({
-      where: { id: Number(id) },
-      data: { status: "approved", approvedAt: new Date() },
+    //* Use transaction with logging
+    const result = await prisma.$transaction(async (tx) => {
+      //* 1. Update disbursement status
+      const approvedRecord = await tx.disbursement.update({
+        where: { id: Number(id) },
+        data: {
+          status: "approved",
+          approvedAt: new Date(),
+        },
+        include: {
+          payee: { select: { name: true } },
+          fundSource: { select: { code: true, name: true } },
+          items: true,
+          deductions: true,
+        },
+      });
+
+      //* 2. Create audit log
+      if (userId) {
+        const logMessage = `APPROVED Disbursement #${id} | Payee: ${record.payee?.name || "N/A"} | Fund: ${record.fundSource?.code || "N/A"} | Net Amount: ₱${Number(record.netAmount).toLocaleString("en-PH", { minimumFractionDigits: 2 })}${remarks ? ` | Remarks: ${remarks}` : ""}`;
+
+        await tx.logs.create({
+          data: {
+            userId: userId,
+            log: logMessage,
+          },
+        });
+      }
+
+      return approvedRecord;
     });
 
     //* Return
     res.status(200).json({
       message: "Disbursement approved successfully.",
-      data: approvedRecord,
+      data: result,
     });
   } catch (error) {
     console.log("Error in approveRec controller: ", error.message);

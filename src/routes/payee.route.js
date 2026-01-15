@@ -6,7 +6,7 @@ import {
   editPayee,
   removePayee,
 } from "../controllers/payee.controller.js";
-import { protectRoute } from "../middleware/auth.middleware.js";
+import { protectRoute, authorize } from "../middleware/auth.middleware.js";
 
 const router = express.Router();
 
@@ -18,11 +18,26 @@ const router = express.Router();
 /**
  * * ACCESS: STAFF AND ADMIN
  */
-router.post("/newPayee", protectRoute, newPayee);
+router.post("/newPayee", protectRoute, authorize(["STAFF", "ADMIN"]), newPayee);
 
-router.get("/listPayee", protectRoute, listPayee);
-router.get("/showPayee/:id", protectRoute, showPayee);
+router.get(
+  "/listPayee",
+  protectRoute,
+  authorize(["STAFF", "ADMIN"]),
+  listPayee
+);
+router.get(
+  "/showPayee/:id",
+  protectRoute,
+  authorize(["STAFF", "ADMIN"]),
+  showPayee
+);
 
-router.put("/editPayee", protectRoute, editPayee);
+router.put(
+  "/editPayee",
+  protectRoute,
+  authorize(["STAFF", "ADMIN"]),
+  editPayee
+);
 
 export default router;

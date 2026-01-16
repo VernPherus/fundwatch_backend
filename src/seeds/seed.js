@@ -1,13 +1,32 @@
+import { prisma } from "../lib/prisma.js";
 import "dotenv/config";
-import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
 
-const prisma = new PrismaClient();
+// Ensure we connect using the environment variable
+const prisma = new PrismaClient({
+  datasources: {
+    db: {
+      url: process.env.DATABASE_URL,
+    },
+  },
+});
+
+// Helper to generate a random date between start and end
+function getRandomDate(start, end) {
+  return new Date(
+    start.getTime() + Math.random() * (end.getTime() - start.getTime())
+  );
+}
+
+// Helper to get random integer
+function getRandomInt(min, max) {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
 
 async function main() {
   console.log("Starting database seed...");
 
-  //* Create Users:
+  // --- 1. Create Users ---
   const passwordHash = await bcrypt.hash("password123", 10);
 
   const admin = await prisma.user.upsert({
@@ -32,7 +51,7 @@ async function main() {
       lastName: "Manager",
       email: "approver@fundwatch.com",
       password: passwordHash,
-      role: "STAFF", // Maps to 'APPROVER' in DB
+      role: "STAFF",
     },
   });
 
@@ -49,9 +68,9 @@ async function main() {
     },
   });
 
-  console.log("Users created.");
+  console.log("✅ Users created.");
 
-  //* Create Fund Sources:
+  // --- 2. Create Fund Sources ---
   const fund1 = await prisma.fundSource.upsert({
     where: { code: "GF-101" },
     update: {},
@@ -85,9 +104,12 @@ async function main() {
     },
   });
 
-  console.log("Fund Sources created.");
+  const funds = [fund1, fund2, fund3];
+  console.log("✅ Fund Sources created.");
 
-  //* Create Payees:
+  // --- 3. Create Payees ---
+  // Note: Using upsert logic manually since name isn't unique in schema,
+  // but good for seeding to prevent duplicates
   const payeesData = [
     {
       name: "Acme Office Supplies",
@@ -114,17 +136,32 @@ async function main() {
       type: "utility",
       remarks: "Monthly electricity bill provider",
     },
+    {
+      name: "TechSolutions Inc",
+      address: "88 Cyberzone, IT Park",
+      tinNum: "555-444-333-222",
+      bankName: "BPI",
+      accountNumber: "9988-7766-55",
+      contactPerson: "Mark Zuckerberg",
+      type: "supplier",
+    },
   ];
 
   const payees = [];
   for (const p of payeesData) {
-    const payee = await prisma.payee.create({ data: p });
-    payees.push(payee);
+    // Check if exists first to avoid duplicates on re-seed
+    const existing = await prisma.payee.findFirst({ where: { name: p.name } });
+    if (!existing) {
+      const payee = await prisma.payee.create({ data: p });
+      payees.push(payee);
+    } else {
+      payees.push(existing);
+    }
   }
 
-  console.log("Payees created.");
+  console.log("✅ Payees created.");
 
-  //* Create Disbursement with Items and Deductions:
+  // --- 4. Create Specific Manual Disbursements ---
 
   // Pending
   await prisma.disbursement.create({
@@ -140,6 +177,8 @@ async function main() {
       particulars: "Payment for office supplies for Q1",
       method: "MANUAL",
       status: "pending",
+      // Specific date
+      dateReceived: new Date("2024-01-15"),
       items: {
         create: [
           {
@@ -175,6 +214,7 @@ async function main() {
       method: "ONLINE",
       status: "approved",
       approvedAt: new Date(),
+      dateReceived: new Date("2024-02-10"),
       items: {
         create: [
           { description: "Labor Cost (Partial)", amount: 200000.0 },
@@ -187,37 +227,77 @@ async function main() {
     },
   });
 
-  // Pending
-  await prisma.disbursement.create({
-    data: {
-      payeeId: payees[2].id,
-      fundSourceId: fund1.id,
-      grossAmount: 25000.0,
-      netAmount: 25000.0,
-      totalDeductions: 0,
-      particulars: "Electricity Bill for January 2024",
-      status: "pending",
-      method: "MANUAL",
-      items: {
-        create: [
-          {
-            description: "Electricity Bill Ref# 999111",
-            amount: 25000.0,
-            accountCode: "5-02-04-020",
-          },
-        ],
+  //* 10 Random disbursements
+  console.log("Generating 10 random disbursements...");
+
+  for (let i = 1; i <= 10; i++) {
+    // Randomly pick Fund and Payee
+    const randomFund = funds[getRandomInt(0, funds.length - 1)];
+    const randomPayee = payees[getRandomInt(0, payees.length - 1)];
+
+    // Random Date within the last 6 months (approx 180 days)
+    const today = new Date();
+    const sixMonthsAgo = new Date();
+    sixMonthsAgo.setDate(today.getDate() - 180);
+    const randomDate = getRandomDate(sixMonthsAgo, today);
+
+    // Random Money
+    const randomGross = getRandomInt(5000, 75000);
+    const taxAmount = Math.floor(randomGross * 0.05); // 5% Tax
+    const netAmount = randomGross - taxAmount;
+
+    // Random Status (70% Approved, 30% Pending)
+    const isApproved = Math.random() > 0.3;
+    const status = isApproved ? "approved" : "pending";
+    const approvedAt = isApproved ? new Date() : null;
+
+    await prisma.disbursement.create({
+      data: {
+        payeeId: randomPayee.id,
+        fundSourceId: randomFund.id,
+        // Generate unique-ish IDs
+        lddapNum: `LDDAP-AUTO-${i}`,
+        orsNum: `ORS-AUTO-${i}`,
+        dvNum: `DV-AUTO-${i}`,
+        uacsCode: `5-02-${getRandomInt(10, 99)}-${getRandomInt(100, 999)}`,
+
+        // Financials
+        grossAmount: randomGross,
+        totalDeductions: taxAmount,
+        netAmount: netAmount,
+
+        particulars: `Generated Record #${i} - ${randomFund.code} payment`,
+        method: Math.random() > 0.5 ? "ONLINE" : "MANUAL",
+        status: status,
+        approvedAt: approvedAt,
+
+        dateReceived: randomDate,
+
+        items: {
+          create: [
+            {
+              description: "Miscellaneous Services/Goods",
+              amount: randomGross,
+              accountCode: `5-02-99-${getRandomInt(100, 999)}`,
+            },
+          ],
+        },
+        deductions: {
+          create: [{ deductionType: "Withholding Tax", amount: taxAmount }],
+        },
       },
-    },
-  });
+    });
+  }
 
-  console.log("Disbursements created.");
+  console.log("Disbursements created (including random generated ones).");
 
-  //* Create Dummy Logs
+  //* Create Dummy Logs ---
   await prisma.logs.createMany({
     data: [
       { userId: encoder.id, log: "Created disbursement DV-2024-01-001" },
       { userId: staff.id, log: "Approved disbursement DV-2024-01-005" },
       { userId: admin.id, log: "Updated Fund Source GF-101 balance" },
+      { userId: encoder.id, log: "Generated bulk seed data for testing" },
     ],
   });
 

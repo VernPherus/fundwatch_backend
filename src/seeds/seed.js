@@ -1,15 +1,14 @@
-import { prisma } from "../lib/prisma.js";
 import "dotenv/config";
+
+import { PrismaClient } from "../generated/prisma/client.ts";
+import { PrismaPg } from "@prisma/adapter-pg";
+
 import bcrypt from "bcryptjs";
 
-// Ensure we connect using the environment variable
-const prisma = new PrismaClient({
-  datasources: {
-    db: {
-      url: process.env.DATABASE_URL,
-    },
-  },
-});
+const connectionString = `${process.env.DATABASE_URL}`;
+
+const adapter = new PrismaPg({ connectionString });
+const prisma = new PrismaClient({ adapter });
 
 // Helper to generate a random date between start and end
 function getRandomDate(start, end) {

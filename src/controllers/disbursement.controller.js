@@ -123,6 +123,7 @@ export const storeRec = async (req, res) => {
 /**
  * * DISPLAY RECORD: Display disbursement records for dashboard
  * Shows disbursement date received, payee, fund, net amount, and status
+ * GET /api/disbursement/display?page=1&limit=10
  * @param {*} req
  * @param {*} res
  * @returns

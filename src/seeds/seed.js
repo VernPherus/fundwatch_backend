@@ -24,7 +24,7 @@ function getRandomInt(min, max) {
 async function main() {
   console.log("Starting database seed...");
 
-  // --- 1. Create Users ---
+  //* --- Create Users ---
   const passwordHash = await bcrypt.hash("password123", 10);
 
   const admin = await prisma.user.upsert({
@@ -68,7 +68,7 @@ async function main() {
 
   console.log("Users created.");
 
-  // --- 2. Create Fund Sources ---
+  //* --- Create Fund Sources ---
   const fund1 = await prisma.fundSource.upsert({
     where: { code: "GF-101" },
     update: {},
@@ -105,7 +105,7 @@ async function main() {
   const funds = [fund1, fund2, fund3];
   console.log("Fund Sources created.");
 
-  // --- 3. Create Payees ---
+  //* --- Create Payees ---
   // Note: Using upsert logic manually since name isn't unique in schema,
   // but good for seeding to prevent duplicates
   const payeesData = [
@@ -159,7 +159,7 @@ async function main() {
 
   console.log("Payees created.");
 
-  // --- 4. Create Specific Manual Disbursements ---
+  // --- Create Specific Manual Disbursements ---
 
   // Pending
   await prisma.disbursement.create({
@@ -225,7 +225,7 @@ async function main() {
     },
   });
 
-  //* 10 Random disbursements
+  //* --- 10 Random disbursements ---
   console.log("Generating 10 random disbursements...");
 
   for (let i = 1; i <= 10; i++) {
@@ -289,7 +289,7 @@ async function main() {
 
   console.log("Disbursements created (including random generated ones).");
 
-  //* Create Dummy Logs ---
+  //* --- Create Dummy Logs ---
   await prisma.logs.createMany({
     data: [
       { userId: encoder.id, log: "Created disbursement DV-2024-01-001" },

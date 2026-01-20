@@ -6,6 +6,7 @@ import {
   showUsers,
   grantAdmin,
   checkAuth,
+  resetPassword,
 } from "../controllers/auth.controller.js";
 import { protectRoute, authorize } from "../middleware/auth.middleware.js";
 
@@ -22,7 +23,8 @@ router.post("/logout", logout);
 router.get("/check", protectRoute, checkAuth);
 
 router.get("/showUsers", protectRoute, authorize(["ADMIN"]), showUsers);
+
+router.put("/resetPassword", protectRoute, resetPassword);
 router.put("/grantAdmin/:id", protectRoute, authorize(["ADMIN"]), grantAdmin);
 
 export default router;
-

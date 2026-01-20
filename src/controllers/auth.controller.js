@@ -2,6 +2,7 @@ import { prisma } from "../lib/prisma.js";
 import bcrypt from "bcryptjs";
 import { generateToken } from "../lib/utils.js";
 import { Role } from "../lib/constants.js";
+import { sentOtpEmail } from "../lib/mail.js";
 
 /**
  ** SIGNUP: Create a user and store into database
@@ -234,6 +235,107 @@ export const checkAuth = async (req, res) => {
     res.status(200).json(user);
   } catch (error) {
     console.log("Error in checkAuth controller: " + error.message);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+/**
+ * * RESET PASSWORD: Send an otp through email and reset the user's password
+ * @param {*} req
+ * @param {*} res
+ */
+export const resetPassword = async (req, res) => {
+  const { email, newPass, confPass, otp } = req.body;
+
+  try {
+    // Request OTP
+    if (email && !otp && !newPass) {
+      const user = await prisma.user.findUnique({ where: { email } });
+
+      // Do not reveal if user exists
+      if (!user) {
+        return res
+          .status(200)
+          .json({ message: "If email exists, OTP has been sent." });
+      }
+
+      // Generate otp
+      const generateOtp = crypto.randomInt(100000, 999999).toString();
+      const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // Set to 10 minutes
+
+      // Save to database:
+      await prisma.oTP.create({
+        data: {
+          email,
+          otp: generateOtp,
+          expiresAt,
+          isUsed: false,
+        },
+      });
+
+      // Send email
+      const emailSent = await sentOtpEmail(email, generateOtp);
+
+      if (!emailSent) {
+        return res.status(500).json({ message: "Error sending email service" });
+      }
+
+      return res.status(200).json({ messag: "OTP sent to your email." });
+    }
+
+    // validation
+    if (!email || !newPass || !confPass || !otp) {
+      return res.status(500).json({ message: "All fields required" });
+    }
+
+    if (newPass !== confPass) {
+      return res
+        .status(500)
+        .json({ message: "New Password does not match password confirmation" });
+    }
+
+    // Confirm OTP
+    const otpRecord = await prisma.oTP.findFirst({
+      where: {
+        email,
+        otp,
+        isUsed: false,
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    if (!otpRecord) {
+      return res.status(400).json({ message: "Invalid OTP." });
+    }
+
+    if (new Date() > otpRecord.expiresAt) {
+      return res
+        .status(400)
+        .json({ message: "OTP has expired. Please request a new one" });
+    }
+
+    await prisma.oTP.update({
+      where: { id: otpRecord.id },
+      data: { isUsed: true },
+    });
+
+    // Update password
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(newPass, salt);
+
+    const updatedPassword = await prisma.user.update({
+      where: { email },
+      data: {
+        password: hashedPassword,
+      },
+    });
+
+    // Return
+    res
+      .status(500)
+      .json({ message: "Password update successful", updatedPassword });
+  } catch (error) {
+    console.log("Error in the resetPassword controller: " + error.message);
     res.status(500).json({ message: "Internal server error" });
   }
 };

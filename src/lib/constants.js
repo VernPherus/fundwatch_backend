@@ -1,31 +1,31 @@
 export const Role = {
-  USER: "user",
-  ADMIN: "admin",
-  STAFF: "staff",
+  USER: "USER",
+  ADMIN: "ADMIN",
+  STAFF: "STAFF",
 };
 
 export const Method = {
-  LDDAP: "lddap",
-  CHECK: "check",
+  LDDAP: "LDDAP",
+  CHECK: "CHECK",
 };
 
 export const PayeeType = {
-  SUPPLIER: "supplier",
-  EMPLOYEE: "employee",
+  SUPPLIER: "SUPPLIER",
+  EMPLOYEE: "EMPLOYEE",
 };
 
 export const LddapMethod = {
-  ONLINE: "online",
-  MANUAL: "manual",
+  ONLINE: "ONLINE",
+  MANUAL: "MANUAL",
 };
 
 export const Status = {
-  PAID: "paid",
-  PENDING: "pending",
+  PAID: "PAID",
+  PENDING: "PENDING",
 };
 
 export const Reset = {
-  MONTHLY: "monthly",
-  YEARLY: "yearly",
-  NONE: "none",
+  MONTHLY: "MONTHLY",
+  YEARLY: "YEARLY",
+  NONE: "NONE",
 };

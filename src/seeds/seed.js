@@ -30,6 +30,10 @@ function getRandomInt(min, max) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
+//* Generate random code for references
+const genCode = (prefix) =>
+  `${prefix}-${getRandomInt(2024, 2025)}-${getRandomInt(1000, 9999)}`;
+
 async function main() {
   console.log("Starting database seed...");
 
@@ -98,16 +102,15 @@ async function main() {
       name: "MDS Trust Fund",
       initialBalance: 1500000.0,
       reset: Reset.MONTHLY,
-    },
-
-    fundEntries: {
-      create: [
-        {
-          name: "NCA - 101",
-          amount: 3000000.0,
-        },
-        { name: "NCA - 102", amount: 2000000.0 },
-      ],
+      fundEntries: {
+        create: [
+          {
+            name: "NCA - 101",
+            amount: 3000000.0,
+          },
+          { name: "NCA - 102", amount: 2000000.0 },
+        ],
+      },
     },
   });
 
@@ -235,7 +238,12 @@ async function main() {
           ],
         },
         deductions: {
-          create: [{ deductionType: "Tax (5%)", amount: tax }],
+          create: [
+            {
+              deductionType: "Tax (5%)",
+              amount: tax.toFixed(2),
+            },
+          ],
         },
       },
     });

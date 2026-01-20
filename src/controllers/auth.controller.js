@@ -75,6 +75,41 @@ export const signup = async (req, res) => {
 };
 
 /**
+ * * UPDATE USER PROFILE: Allows for name update
+ * TODO: Add update password capabilities
+ * @param {*} req
+ * @param {*} res
+ */
+export const updateProfile = async (req, res) => {
+  const { id } = req.params;
+  const { username, firstName, lastName } = req.body;
+
+  try {
+    // Validation
+    const dataToUpdate = {};
+    if (username) dataToUpdate.username = username;
+    if (firstName) dataToUpdate.firstName = firstName;
+    if (lastName) dataToUpdate.lastName = lastName;
+
+    // Update user
+    const updatedUser = await prisma.user.update({
+      where: {
+        id: id,
+      },
+      data: dataToUpdate,
+    });
+
+    // Return
+    res
+      .status(200)
+      .json({ message: "Profile updated successfully", updatedUser });
+  } catch (error) {
+    console.log("Error in updateProfile controller: " + error.message);
+    res.status(500).json({ message: "Internal server error." });
+  }
+};
+
+/**
  * * LOGIN:
  * @param {*} req
  * @param {*} res

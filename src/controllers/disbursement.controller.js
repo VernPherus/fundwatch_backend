@@ -261,120 +261,169 @@ export const showRec = async (req, res) => {
 };
 
 /**
- * * EDIT RECORD: Edit a record's reference codes, fund source and payee
+ * * SEARCH RECORD: Search disbursement record
+ * @param {*} req
+ * @param {*} res
+ */
+export const searchRec = async (req, res) => {
+  const { searchItem } = req.body;
+
+  try {
+  } catch (error) {
+    console.log("Error in searchRec controller: " + error.message);
+    return res.status(500).json({ message: "Internal server error." });
+  }
+};
+
+/**
+ * * EDIT RECORD: Edit a record's finances, reference codes, fund source and payee
  * @param {*} req
  * @param {*} res
  * @returns
  */
 export const editRec = async (req, res) => {
   const { id } = req.params;
+  const userId = req.user?.id;
+
   const {
-    //* References (The most common edits)
+    //* FK
     payeeId,
     fundSourceId,
+
+    //* Details
     lddapNum,
+    checkNum,
+    particulars,
+    method,
+    lddapMethod,
+    dateReceived,
+    ageLimit,
+
+    //* References
     orsNum,
     dvNum,
     uacsCode,
     respCode,
-    particulars,
-    method,
-    dateReceived,
-    ageLimit,
 
-    //* Financials (Optional - only if correcting amounts)
+    //* Financials
     items,
     deductions,
   } = req.body;
 
   try {
     //* Validation
+
+    // Initial fetch to validate status
     const currentRecord = await prisma.disbursement.findUnique({
       where: { id: Number(id) },
-      include: { items: true, deductions: true },
+      include: {
+        items: true,
+        deductions: true,
+        references: true,
+      },
     });
 
     if (!currentRecord) {
       return res.status(404).json({ message: "Disbursement not found." });
     }
 
-    //* Prevent editing if already approved/released
-    if (currentRecord.status !== "pending") {
-      return res.status(403).json({
-        message: `Cannot edit record. Current status is ${currentRecord.status}.`,
-      });
-    }
-
-    //* Prepare update object
-    const updateData = {
-      payeeId: payeeId ? Number(payeeId) : undefined,
-      fundSourceId: fundSourceId ? Number(fundSourceId) : undefined,
-      lddapNum,
-      orsNum,
-      dvNum,
-      uacsCode,
-      respCode,
-      particulars,
-      method,
-      ageLimit: ageLimit ? Number(ageLimit) : undefined,
-      dateReceived: dateReceived ? new Date(dateReceived) : undefined,
-    };
-
     //* Recalculations
     let newGross = Number(currentRecord.grossAmount);
     let newTotalDeductions = Number(currentRecord.totalDeductions);
+    let itemUpdateOp = undefined;
+    let deductionUpdateOp = undefined;
 
-    //* Handle items
+    //* Handle Items update
     if (items && Array.isArray(items)) {
-      // Calculate new Gross from the INCOMING items
-      newGross = items.reduce((sum, item) => sum + Number(item.amount), 0);
+      newGross = items.reduce((sum, item) => sum + Number(item.amount || 0), 0);
 
-      // Add Prisma instruction to replace items
-      updateData.items = {
-        deleteMany: {}, // Remove ALL old items for this ID
+      // Delete old items and create new ones
+      itemsUpdateOp = {
+        deleteMany: {},
         create: items.map((item) => ({
           description: item.description,
           accountCode: item.accountCode,
           amount: Number(item.amount),
         })),
       };
-
-      updateData.grossAmount = newGross;
     }
 
-    //* Handle deductions
+    //* Handle deductions update
     if (deductions && Array.isArray(deductions)) {
-      // Calculate new Deductions from the INCOMING array
       newTotalDeductions = deductions.reduce(
-        (sum, ded) => sum + Number(ded.amount),
+        (sum, ded) => sum + Number(ded.amount || 0),
         0,
       );
 
-      // Add Prisma instruction to replace deductions
-      updateData.deductions = {
-        deleteMany: {}, // Remove ALL old deductions
+      deductionsUpdateOp = {
+        deleteMany: {},
         create: deductions.map((ded) => ({
           deductionType: ded.deductionType,
           amount: Number(ded.amount),
         })),
       };
-
-      updateData.totalDeductions = newTotalDeductions;
     }
 
-    //* Recalculation
-    if (items || deductions) {
-      updateData.netAmount = newGross - newTotalDeductions;
-    }
+    // Calculate new Net
+    const newNet = newGross - newTotalDeductions;
 
-    //* Execute update
-    const updatedRecord = await prisma.disbursement.update({
-      where: { id: Number(id) },
-      data: updateData,
-      include: {
-        items: true,
-        deductions: true,
-      },
+    //* Handle Disbursement Update
+    const updatedRecord = await prisma.$transaction(async (tx) => {
+      // Update Disbursement
+      const record = await tx.disbursement.update({
+        where: { id: Number(id) },
+        data: {
+          // Direct Fields
+          payeeId: payeeId ? Number(payeeId) : undefined,
+          fundSourceId: fundSourceId ? Number(fundSourceId) : undefined,
+          lddapNum,
+          checkNum,
+          particulars,
+          method,
+          lddapMthd: lddapMethod,
+          ageLimit: ageLimit ? Number(ageLimit) : undefined,
+          dateReceived: dateReceived ? new Date(dateReceived) : undefined,
+
+          // Financials
+          grossAmount: newGross,
+          totalDeductions: newTotalDeductions,
+          netAmount: newNet,
+
+          // Nested Relations: Items & Deductions
+          items: itemsUpdateOp,
+          deductions: deductionsUpdateOp,
+
+          // Nested Relations: References
+          references: {
+            deleteMany: {}, // Clear old references
+            create: {
+              acicNum: acicNum || "",
+              orsNum: orsNum || "",
+              dvNum: dvNum || "",
+              uacsCode: uacsCode || "",
+              respCode: respCode || "",
+            },
+          },
+        },
+        include: {
+          items: true,
+          deductions: true,
+          references: true,
+          payee: true,
+        },
+      });
+
+      // Create log
+      const financialNote =
+        items || deductions
+          ? `(Updated net: ${record.netAmount})`
+          : `(Details Update)`;
+
+      await createLog(
+        tx,
+        userId,
+        `Edited disbursement #${record.id} - ${record.payee?.name} ${financialNote}`,
+      );
     });
 
     res.status(200).json(updatedRecord);

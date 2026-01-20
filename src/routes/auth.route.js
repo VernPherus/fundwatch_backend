@@ -22,7 +22,7 @@ router.post("/logout", logout);
 router.get("/check", protectRoute, checkAuth);
 
 router.get("/showUsers", protectRoute, authorize(["ADMIN"]), showUsers);
-router.put("/grantAdmin", protectRoute, authorize(["ADMIN"]), grantAdmin);
+router.put("/grantAdmin/:id", protectRoute, authorize(["ADMIN"]), grantAdmin);
 
 export default router;
 

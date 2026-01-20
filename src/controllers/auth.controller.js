@@ -1,6 +1,7 @@
 import { prisma } from "../lib/prisma.js";
 import bcrypt from "bcryptjs";
 import { generateToken } from "../lib/utils.js";
+import { Role } from "../lib/constants.js";
 
 /**
  ** SIGNUP: Create a user and store into database
@@ -74,7 +75,7 @@ export const signup = async (req, res) => {
 };
 
 /**
- * LOGIN:
+ * * LOGIN:
  * @param {*} req
  * @param {*} res
  */
@@ -113,7 +114,7 @@ export const login = async (req, res) => {
 };
 
 /**
- * LOGOUT:
+ * * LOGOUT:
  * @param {*} req
  * @param {*} res
  */
@@ -128,7 +129,7 @@ export const logout = (req, res) => {
 };
 
 /**
- * SHOW USERS: Displays all users
+ * * SHOW USERS: Displays all users
  * @param {*} req
  * @param {*} res
  */
@@ -145,11 +146,30 @@ export const showUsers = async (req, res) => {
 };
 
 /**
- * GRANT ADMIN: Updates user role to admin
+ * * GRANT ADMIN: Updates user role to admin
  * @param {*} req
  * @param {*} res
  */
-export const grantAdmin = async (req, res) => { };
+export const grantAdmin = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const promoteUser = await prisma.user.update({
+      where: { id: id },
+      data: {
+        role: Role.ADMIN,
+      },
+    });
+
+    res.status(200).json({
+      message: "User has been granted admin privileges.",
+      promoteUser,
+    });
+  } catch (error) {
+    console.log("Error in grandAdmin controller: " + error.message);
+    res.status(500).json({ message: "Internal server error." });
+  }
+};
 
 /**
  * CHECK AUTH: Checks if current user is authenticated

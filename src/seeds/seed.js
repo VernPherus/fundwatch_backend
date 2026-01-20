@@ -2,6 +2,15 @@ import "dotenv/config";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "../generated/prisma/client.ts";
 
+import {
+  Role,
+  Method,
+  PayeeType,
+  LddapMethod,
+  Status,
+  Reset,
+} from "../lib/constants.js";
+
 import bcrypt from "bcryptjs";
 
 const connectionString = `${process.env.DATABASE_URL}`;
@@ -9,14 +18,14 @@ const connectionString = `${process.env.DATABASE_URL}`;
 const adapter = new PrismaPg({ connectionString });
 const prisma = new PrismaClient({ adapter });
 
-// Helper to generate a random date between start and end
+//* Helper to generate a random date between start and end
 function getRandomDate(start, end) {
   return new Date(
-    start.getTime() + Math.random() * (end.getTime() - start.getTime())
+    start.getTime() + Math.random() * (end.getTime() - start.getTime()),
   );
 }
 
-// Helper to get random integer
+//* Helper to get random integer
 function getRandomInt(min, max) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
@@ -36,7 +45,7 @@ async function main() {
       lastName: "Admin",
       email: "admin@fundwatch.com",
       password: passwordHash,
-      role: "ADMIN",
+      role: Role.ADMIN,
     },
   });
 
@@ -49,7 +58,7 @@ async function main() {
       lastName: "Manager",
       email: "approver@fundwatch.com",
       password: passwordHash,
-      role: "STAFF",
+      role: Role.STAFF,
     },
   });
 
@@ -58,11 +67,11 @@ async function main() {
     update: {},
     create: {
       username: "encoder_user",
-      firstName: "Data",
-      lastName: "Encoder",
+      firstName: "User",
+      lastName: "View",
       email: "encoder@fundwatch.com",
       password: passwordHash,
-      role: "USER",
+      role: Role.USER,
     },
   });
 
@@ -74,40 +83,38 @@ async function main() {
     update: {},
     create: {
       code: "GF-101",
-      name: "General Fund 2024",
+      name: "Regular Agency Fund",
+      description: "General Fund for regular agency operations (PS & MODE)",
       initialBalance: 5000000.0,
-      description: "Main operational fund for fiscal year 2024",
+      reset: Reset.NONE,
     },
   });
 
   const fund2 = await prisma.fundSource.upsert({
-    where: { code: "TF-202" },
+    where: { code: "F-184" },
     update: {},
     create: {
-      code: "TF-202",
-      name: "Trust Fund - Calamity",
+      code: "F-184",
+      name: "MDS Trust Fund",
       initialBalance: 1500000.0,
-      description: "Dedicated fund for emergency response",
+      reset: Reset.MONTHLY,
+    },
+
+    fundEntries: {
+      create: [
+        {
+          name: "NCA - 101",
+          amount: 3000000.0,
+        },
+        { name: "NCA - 102", amount: 2000000.0 },
+      ],
     },
   });
 
-  const fund3 = await prisma.fundSource.upsert({
-    where: { code: "DF-303" },
-    update: {},
-    create: {
-      code: "DF-303",
-      name: "Development Fund",
-      initialBalance: 3000000.0,
-      description: "Infrastructure and development projects",
-    },
-  });
-
-  const funds = [fund1, fund2, fund3];
+  const funds = [fund1, fund2];
   console.log("Fund Sources created.");
 
   //* --- Create Payees ---
-  // Note: Using upsert logic manually since name isn't unique in schema,
-  // but good for seeding to prevent duplicates
   const payeesData = [
     {
       name: "Acme Office Supplies",
@@ -116,7 +123,7 @@ async function main() {
       bankName: "Landbank",
       accountNumber: "1111-2222-33",
       contactPerson: "John Doe",
-      type: "supplier",
+      type: PayeeType.SUPPLIER,
     },
     {
       name: "BuildRight Construction",
@@ -125,23 +132,20 @@ async function main() {
       bankName: "BDO",
       accountNumber: "5555-6666-77",
       contactPerson: "Jane Smith",
-      type: "contractor",
+      type: PayeeType.SUPPLIER,
     },
     {
-      name: "PowerGrid Corp",
+      name: "John Doe",
       address: "99 Utility Road",
-      tinNum: "444-555-666-000",
-      type: "utility",
-      remarks: "Monthly electricity bill provider",
+      type: PayeeType.EMPLOYEE,
+      remarks: "",
     },
     {
       name: "TechSolutions Inc",
       address: "88 Cyberzone, IT Park",
-      tinNum: "555-444-333-222",
       bankName: "BPI",
       accountNumber: "9988-7766-55",
-      contactPerson: "Mark Zuckerberg",
-      type: "supplier",
+      type: PayeeType.EMPLOYEE,
     },
   ];
 
@@ -159,135 +163,144 @@ async function main() {
 
   console.log("Payees created.");
 
-  // --- Create Specific Manual Disbursements ---
+  //* Create Disbursements
+  // Clean up old disbursements first to avoid clutter during dev
+  // await prisma.disbursement.deleteMany({});
 
-  // Pending
-  await prisma.disbursement.create({
-    data: {
-      payeeId: payees[0].id,
-      fundSourceId: fund1.id,
-      lddapNum: "LDDAP-2024-01-001",
-      orsNum: "ORS-2024-01-001",
-      dvNum: "DV-2024-01-001",
-      grossAmount: 15000.0,
-      netAmount: 14250.0,
-      totalDeductions: 750.0,
-      particulars: "Payment for office supplies for Q1",
-      method: "MANUAL",
-      status: "pending",
-      // Specific date
-      dateReceived: new Date("2024-01-15"),
-      items: {
-        create: [
-          {
-            description: "Bond Paper (A4)",
-            amount: 5000.0,
-            accountCode: "5-02-03-010",
-          },
-          {
-            description: "Ink Cartridges",
-            amount: 10000.0,
-            accountCode: "5-02-03-010",
-          },
-        ],
-      },
-      deductions: {
-        create: [{ deductionType: "Tax (5%)", amount: 750.0 }],
-      },
-    },
-  });
+  const today = new Date();
+  const sixMonthsAgo = new Date();
+  sixMonthsAgo.setDate(today.getDate() - 180);
 
-  // Approved
-  await prisma.disbursement.create({
-    data: {
-      payeeId: payees[1].id,
-      fundSourceId: fund3.id,
-      lddapNum: "LDDAP-2024-01-002",
-      orsNum: "ORS-2024-01-005",
-      dvNum: "DV-2024-01-005",
-      grossAmount: 500000.0,
-      netAmount: 475000.0,
-      totalDeductions: 25000.0,
-      particulars: "Partial payment for Brgy Hall renovation",
-      method: "ONLINE",
-      status: "approved",
-      approvedAt: new Date(),
-      dateReceived: new Date("2024-02-10"),
-      items: {
-        create: [
-          { description: "Labor Cost (Partial)", amount: 200000.0 },
-          { description: "Construction Materials", amount: 300000.0 },
-        ],
-      },
-      deductions: {
-        create: [{ deductionType: "Tax (5%)", amount: 25000.0 }],
-      },
-    },
-  });
-
-  //* --- 10 Random disbursements ---
-  console.log("Generating 10 random disbursements...");
+  // --- LDDAP Method (10 Items) ---
+  console.log("Generating 10 LDDAP Disbursements...");
 
   for (let i = 1; i <= 10; i++) {
-    // Randomly pick Fund and Payee
     const randomFund = funds[getRandomInt(0, funds.length - 1)];
     const randomPayee = payees[getRandomInt(0, payees.length - 1)];
-
-    // Random Date within the last 6 months (approx 180 days)
-    const today = new Date();
-    const sixMonthsAgo = new Date();
-    sixMonthsAgo.setDate(today.getDate() - 180);
     const randomDate = getRandomDate(sixMonthsAgo, today);
 
-    // Random Money
-    const randomGross = getRandomInt(5000, 75000);
-    const taxAmount = Math.floor(randomGross * 0.05); // 5% Tax
-    const netAmount = randomGross - taxAmount;
+    // Financials
+    const gross = getRandomInt(10000, 50000);
+    const tax = gross * 0.05;
+    const net = gross - tax;
 
-    // Random Status (70% Approved, 30% Pending)
-    const isApproved = Math.random() > 0.3;
-    const status = isApproved ? "approved" : "pending";
-    const approvedAt = isApproved ? new Date() : null;
+    // Variation: 50% Online, 50% Manual
+    const isOnline = i % 2 === 0;
+    const lddapMethod = isOnline ? LddapMethod.ONLINE : LddapMethod.MANUAL;
+
+    // Variation: 70% Paid, 30% Pending
+    const isPaid = Math.random() > 0.3;
+    const status = isPaid ? Status.PAID : Status.PENDING;
 
     await prisma.disbursement.create({
       data: {
         payeeId: randomPayee.id,
         fundSourceId: randomFund.id,
-        // Generate unique-ish IDs
-        lddapNum: `LDDAP-AUTO-${i}`,
-        orsNum: `ORS-AUTO-${i}`,
-        dvNum: `DV-AUTO-${i}`,
-        uacsCode: `5-02-${getRandomInt(10, 99)}-${getRandomInt(100, 999)}`,
 
-        // Financials
-        grossAmount: randomGross,
-        totalDeductions: taxAmount,
-        netAmount: netAmount,
+        // --- LDDAP Specific Fields ---
+        method: Method.LDDAP,
+        lddapMthd: lddapMethod,
+        lddapNum: genCode("LDDAP"),
+        checkNum: null, // No check num for LDDAP
 
-        particulars: `Generated Record #${i} - ${randomFund.code} payment`,
-        method: Math.random() > 0.5 ? "ONLINE" : "MANUAL",
-        status: status,
-        approvedAt: approvedAt,
-
+        // --- Common Fields ---
         dateReceived: randomDate,
+        dateEntered: new Date(),
+        grossAmount: gross,
+        totalDeductions: tax,
+        netAmount: net,
+        particulars: `Payment for services (LDDAP ${lddapMethod}) - Batch ${i}`,
+        status: status,
+        approvedAt: isPaid ? new Date() : null,
 
+        // --- Relations: References (New Schema) ---
+        references: {
+          create: {
+            acicNum: genCode("ACIC"),
+            orsNum: genCode("ORS"),
+            dvNum: genCode("DV"),
+            uacsCode: `5-02-${getRandomInt(10, 99)}-${getRandomInt(100, 999)}`,
+            respCode: `19-001-03-${getRandomInt(100, 999)}`,
+          },
+        },
+
+        // --- Relations: Items & Deductions ---
         items: {
           create: [
             {
-              description: "Miscellaneous Services/Goods",
-              amount: randomGross,
-              accountCode: `5-02-99-${getRandomInt(100, 999)}`,
+              description: "Generic Service",
+              amount: gross,
+              accountCode: "5-02-99-990",
             },
           ],
         },
         deductions: {
-          create: [{ deductionType: "Withholding Tax", amount: taxAmount }],
+          create: [{ deductionType: "Tax (5%)", amount: tax }],
         },
       },
     });
   }
 
-  console.log("Disbursements created (including random generated ones).");
+  // --- CHECK Method (10 Items) ---
+  console.log("Generating 10 CHECK Disbursements...");
+
+  for (let i = 1; i <= 10; i++) {
+    const randomFund = funds[getRandomInt(0, funds.length - 1)];
+    const randomPayee = payees[getRandomInt(0, payees.length - 1)];
+    const randomDate = getRandomDate(sixMonthsAgo, today);
+
+    const gross = getRandomInt(5000, 20000); // Checks often smaller amounts
+    const tax = 0; // Simple example with no tax
+    const net = gross;
+
+    const isPaid = Math.random() > 0.3;
+    const status = isPaid ? Status.PAID : Status.PENDING;
+
+    await prisma.disbursement.create({
+      data: {
+        payeeId: randomPayee.id,
+        fundSourceId: randomFund.id,
+
+        // --- CHECK Specific Fields ---
+        method: Method.CHECK,
+        lddapMthd: null, // Not applicable
+        lddapNum: null,
+        checkNum: genCode("CHK"), // Required for Check method
+
+        // --- Common Fields ---
+        dateReceived: randomDate,
+        dateEntered: new Date(),
+        grossAmount: gross,
+        totalDeductions: tax,
+        netAmount: net,
+        particulars: `Payment via Check - Batch ${i}`,
+        status: status,
+        approvedAt: isPaid ? new Date() : null,
+
+        // --- Relations: References ---
+        references: {
+          create: {
+            acicNum: "N/A", // Checks might not have ACIC
+            orsNum: genCode("ORS"),
+            dvNum: genCode("DV"),
+            uacsCode: `5-02-${getRandomInt(10, 99)}-${getRandomInt(100, 999)}`,
+            respCode: `19-001-03-${getRandomInt(100, 999)}`,
+          },
+        },
+
+        items: {
+          create: [
+            {
+              description: "Supply Purchase",
+              amount: gross,
+              accountCode: "5-02-03-010",
+            },
+          ],
+        },
+        // No deductions for this batch
+      },
+    });
+  }
 
   //* --- Create Dummy Logs ---
   await prisma.logs.createMany({

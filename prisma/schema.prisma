@@ -37,6 +37,7 @@ model FundSource {
   description    String?
   isActive       Boolean        @default(true) @map("is_active")
   createdAt      DateTime       @default(now()) @map("created_at")
+  reset          Reset          @default(NONE)
   updatedAt      DateTime       @updatedAt @map("updated_at")
   disbursements  Disbursement[]
   fundEntries    FundEntry[]
@@ -186,4 +187,10 @@ enum LddapMethod {
 enum Status {
   PAID
   PENDING
+}
+
+enum Reset {
+  MONTHLY
+  YEARLY
+  NONE
 }

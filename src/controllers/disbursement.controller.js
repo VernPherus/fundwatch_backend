@@ -1,41 +1,48 @@
 import { prisma } from "../lib/prisma.js";
+import { Role, Method, PayeeType, Status } from "../generated/prisma/enums.js";
+import { createLog } from "../lib/auditLogger.js";
 
 /**
- * * STORE RECORD:
+ * * STORE RECORD: Store disbursement, disbursement items, deductions and calculate funds
  * @param {*} req
  * @param {*} res
  * @returns
  */
 export const storeRec = async (req, res) => {
-  // TODO: Add user logging
-
   const {
-    //* References
+    //* FKs
     payeeId,
     fundsourceId,
 
-    //* Documents
+    //* Disb Details
     lddapNum,
+    checkNum,
+    particulars,
+    method,
+    lddapMethod,
+    ageLimit,
+    status,
+
+    //* Dates
+    dateReceived,
+    approvedAt,
+
+    //* Financial
+    grossAmount,
+
+    //* References
+    acicNum,
     orsNum,
     dvNum,
     uacsCode,
     respCode,
 
-    //* Time
-    dateReceived,
-
-    //* Financial
-    grossAmount,
-
-    //* Details
-    particulars,
-    method,
-    ageLimit,
-
     //* Items
     items = [],
     deductions = [],
   } = req.body;
+
+  const userId = req.user?.id;
 
   try {
     //* Validation
@@ -55,6 +62,16 @@ export const storeRec = async (req, res) => {
         .json({ message: "Disbursement method is required." });
     }
 
+    if (!dateReceived) {
+      return res.status(400).json({ message: "Date Received is required." });
+    }
+
+    if (items.length === 0) {
+      return res
+        .status(400)
+        .json({ message: "At least one item is required." });
+    }
+
     //* Calculations
     // Sum up items for Gross Amount
     const calculatedGross = items.reduce((sum, item) => {
@@ -70,47 +87,70 @@ export const storeRec = async (req, res) => {
     const calculatedNet = calculatedGross - calculatedDeductions;
 
     //* Create disbursement
-    const newDisbursement = await prisma.disbursement.create({
-      data: {
-        // FKs
-        payeeId: Number(payeeId),
-        fundSourceId: Number(fundsourceId),
+    const newDisbursement = await prisma.$transaction(async (tx) => {
+      const record = await tx.disbursement.create({
+        data: {
+          // FK
+          payeeId: Number(payeeId),
+          fundSourceId: Number(fundsourceId),
 
-        // Document Details
-        lddapNum,
-        orsNum,
-        dvNum,
-        uacsCode,
-        respCode,
-        particulars,
-        method,
-        ageLimit: ageLimit ? Number(ageLimit) : 5,
-        dateReceived: dateReceived ? new Date(dateReceived) : null,
+          //Main Details
+          lddapNum,
+          checkNum,
+          particulars,
+          method,
+          lddapMthd: lddapMethod,
+          status: status || Status.PAID,
+          ageLimit: ageLimit ? Number(ageLimit) : 5,
 
-        // Financials (Calculated above)
-        grossAmount: calculatedGross,
-        totalDeductions: calculatedDeductions,
-        netAmount: calculatedNet,
+          // Dates
+          dateReceived: new Date(dateReceived),
+          approvedAt: approvedAt ? new Date(approvedAt) : null,
 
-        // NESTED WRITES: Create relations automatically
-        items: {
-          create: items.map((item) => ({
-            description: item.description,
-            accountCode: item.accountCode,
-            amount: Number(item.amount),
-          })),
+          // Financials
+          grossAmount: calculatedGross,
+          totalDeductions: calculatedDeductions,
+          netAmount: calculatedNet,
+
+          items: {
+            create: items.map((item) => ({
+              description: item.description,
+              accountCode: item.accountCode,
+              amount: Number(item.amount),
+            })),
+          },
+          deductions: {
+            create: items.map((ded) => ({
+              deductionType: ded.deductionType,
+              amount: Number(ded.amount),
+            })),
+          },
+          references: {
+            create: {
+              acicNum: acicNum || "",
+              orsNum: orsNum || "",
+              dvNum: dvNum || "",
+              uacsCode: uacsCode || "",
+              respCode: respCode || "",
+            },
+          },
         },
-        deductions: {
-          create: deductions.map((ded) => ({
-            deductionType: ded.deductionType,
-            amount: Number(ded.amount),
-          })),
+        include: {
+          items: true,
+          deductions: true,
+          references: true,
+          payee: true,
+          fundSource: true,
         },
-      },
-      include: {
-        items: true,
-        deductions: true,
-      },
+      });
+
+      const refId = record.lddapNum || record.checkNum || `ID#${record.id}`;
+
+      await createLog(
+        tx,
+        userId,
+        `Created disbursement ${refId} for ${record.payee?.name} (Net: ${record.netAmount})`,
+      );
     });
 
     res.status(201).json(newDisbursement);
@@ -307,7 +347,7 @@ export const editRec = async (req, res) => {
       // Calculate new Deductions from the INCOMING array
       newTotalDeductions = deductions.reduce(
         (sum, ded) => sum + Number(ded.amount),
-        0
+        0,
       );
 
       // Add Prisma instruction to replace deductions

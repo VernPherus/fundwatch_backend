@@ -5,21 +5,53 @@ import {
   showRec,
   editRec,
   approveRec,
+  removeRec,
 } from "../controllers/disbursement.controller.js";
-import { protectRoute } from "../middleware/auth.middleware.js";
+import { protectRoute, authorize } from "../middleware/auth.middleware.js";
 
 const router = express.Router();
 
 /**
  * * DISBURSEMENT ROUTES
  */
-router.get("/display", protectRoute, displayRec);
-router.get("/show/:id", protectRoute, showRec);
 
-router.post("/store", protectRoute, storeRec);
+/**
+ * DISPLAY RECORDS SAMPLE
+ * GET /api/disbursement/display?page=1&limit=10&search=acme&status=PENDING&startDate=2024-01-01
+ */
+router.get(
+  "/display",
+  protectRoute,
+  authorize(["USER", "ADMIN", "STAFF"]),
+  displayRec,
+);
 
-router.put("/editRec/:id", protectRoute, editRec);
-router.put("/approve/:id", protectRoute, approveRec);
+router.get(
+  "/show/:id",
+  protectRoute,
+  authorize(["USER", "ADMIN", "STAFF"]),
+  showRec,
+);
+
+router.post("/store", protectRoute, authorize(["ADMIN", "STAFF"]), storeRec);
+
+router.put(
+  "/editRec/:id",
+  protectRoute,
+  authorize(["ADMIN", "STAFF"]),
+  editRec,
+);
+router.put(
+  "/approve/:id",
+  protectRoute,
+  authorize(["ADMIN", "STAFF"]),
+  approveRec,
+);
+router.put(
+  "/delete/:id",
+  protectRoute,
+  authorize(["ADMIN", "STAFF"]),
+  removeRec,
+);
 
 export default router;
-

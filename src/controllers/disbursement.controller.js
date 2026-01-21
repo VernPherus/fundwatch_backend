@@ -1,5 +1,5 @@
 import { prisma } from "../lib/prisma.js";
-import { Role, Method, PayeeType, Status } from "../lib/constants.js";
+import { Status } from "../lib/constants.js";
 import { createLog } from "../lib/auditLogger.js";
 import { findActiveRecord } from "../lib/dbHelpter.js";
 
@@ -592,8 +592,8 @@ export const removeRec = async (req, res) => {
     }
 
     // Perform soft deletion
-    const deleteRecord = await prisma.$transaction(async (tx) => {
-      const record = await tx.disbursement.update({
+    await prisma.$transaction(async (tx) => {
+      await tx.disbursement.update({
         where: { id: Number(id) },
         data: {
           deletedAt: new Date(),

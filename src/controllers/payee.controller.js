@@ -1,13 +1,13 @@
 import { prisma } from "../lib/prisma.js";
+import { createLog } from "../lib/auditLogger.js";
 
 /**
  * * NEW PAYEE: Create payee source
- * @param {*} req
- * @param {*} res
+ * @param {object} req
+ * @param {object} res
  * @returns
  */
 export const newPayee = async (req, res) => {
-  // TODO: Add user logs
   const {
     name,
     address,
@@ -23,10 +23,14 @@ export const newPayee = async (req, res) => {
     remarks,
   } = req.body;
 
+  const userId = req.user?.id;
+
   try {
     //* Validation
-    if (!name) {
-      res.status(400).json("Payee name is required.");
+    if (!name || !type || !mobileNum) {
+      return res
+        .status(400)
+        .json({ message: "Name, type, and mobileNum are required fields." });
     }
 
     //* Check for duplications
@@ -40,22 +44,33 @@ export const newPayee = async (req, res) => {
         .json({ message: "A payee with this name already exists" });
     }
 
-    //* Create payee
-    const savedPayee = await prisma.payee.create({
-      data: {
-        name,
-        address,
-        type: type || "supplier",
-        tinNum,
-        bankName,
-        bankBranch,
-        accountName,
-        accountNumber,
-        contactPerson,
-        mobileNumber: mobileNum,
-        email,
-        remarks,
-      },
+    // Transaction
+    const savedPayee = await prisma.$transaction(async (tx) => {
+      // Create new payee
+      const payee = await tx.payee.create({
+        data: {
+          name,
+          address,
+          type,
+          tinNum,
+          bankName,
+          bankBranch,
+          accountName,
+          accountNumber,
+          contactPerson,
+          mobileNum,
+          email,
+          remarks,
+          isActive: true,
+        },
+      });
+
+      // Create log
+      await createLog(
+        tx,
+        userId,
+        `Created new Payee: ${payee.name} (${payee.type || "Unspecified"})`,
+      );
     });
 
     res.status(201).json({ message: "New payee created", savedPayee });
@@ -67,13 +82,11 @@ export const newPayee = async (req, res) => {
 
 /**
  * * LIST PAYEE: Displays payee for disbursement form
- * @param {*} req
  * @param {*} res
  * @returns
  */
-export const listPayee = async (req, res) => {
+export const listPayee = async (res) => {
   try {
-    // TODO: Add pagination
     // Get payee:
     const payees = await prisma.payee.findMany();
 
@@ -82,8 +95,6 @@ export const listPayee = async (req, res) => {
     console.log("Error in displayPayee controller: ", error.message);
     res.status(500).json({ message: "Internal server error." });
   }
-
-  return res.status(200).json({ message: "Display payees for dashboard" });
 };
 
 /**
@@ -132,31 +143,74 @@ export const editPayee = async (req, res) => {
     isActive,
   } = req.body;
 
+  const userId = req.user?.id;
+
   try {
     //* Validation
     if (!id) {
       return res.status(400).json({ message: "Payee ID is required." });
     }
 
-    const updatedPayee = await prisma.payee.update({
-      where: {
-        id: Number(id),
-      },
-      data: {
-        name,
-        address,
-        type,
-        tinNum,
-        bankName,
-        bankBranch,
-        accountName,
-        accountNumber,
-        contactPerson,
-        mobileNumber: mobileNum,
-        email,
-        remarks,
-        isActive,
-      },
+    const currentPayee = await prisma.payee.findUnique({
+      where: { id: Number(id) },
+    });
+
+    if (!currentPayee) {
+      return res.status(404).json({ message: "Payee not found." });
+    }
+
+    // Check for duplicates
+    if (name && name !== currentPayee.name) {
+      const duplicate = await prisma.payee.findFirst({
+        where: { name: name },
+      });
+      if (duplicate) {
+        return res
+          .status(409)
+          .json({ message: "Another payee with this name already exists." });
+      }
+    }
+
+    // Transaction
+    const updatedPayee = await prisma.$transaction(async (tx) => {
+      // Update
+      const payee = await tx.payee.update({
+        where: {
+          id: Number(id),
+        },
+        data: {
+          name,
+          address,
+          type,
+          tinNum,
+          bankName,
+          bankBranch,
+          accountName,
+          accountNumber,
+          contactPerson,
+          mobileNumber: mobileNum,
+          email,
+          remarks,
+          isActive,
+        },
+      });
+
+      // Create log
+      const statusNote =
+        isActive !== undefined && isActive !== currentPayee.isActive
+          ? ` (Status changed to ${isActive ? "Active" : "Inactive"})`
+          : "";
+
+      const nameNote =
+        name && name !== currentPayee.name
+          ? ` (Renamed from ${currentPayee.name})`
+          : "";
+
+      await createLog(
+        tx,
+        userId,
+        `Updated Payee: ${payee.name}${nameNote}${statusNote}`,
+      );
     });
 
     res.status(200).json({ updatedPayee });
@@ -173,5 +227,44 @@ export const editPayee = async (req, res) => {
  * @returns
  */
 export const removePayee = async (req, res) => {
-  return res.status(200).json({ message: "Deactivated payee" });
+  const { id } = req.params;
+  const userId = req.user?.id;
+
+  try {
+    // Validation
+    const payeeToCheck = await prisma.payee.findUnique({
+      where: { id: Number(id) },
+      select: {
+        id: true,
+        name: true,
+        deletedAt: true,
+      },
+    });
+
+    if (!payeeToCheck) {
+      return res.status(404).json({ message: "Payee not found." });
+    }
+
+    if (payeeToCheck.deletedAt) {
+      return res.status(400).json({ message: "Payee is already removed." });
+    }
+
+    // Transaction
+    await prisma.$transaction(async (tx) => {
+      // Soft delete operation
+      await tx.payee.update({
+        where: { id: Number(id) },
+        data: {
+          isActive: false,
+          deletedAt: new Date(),
+        },
+      });
+
+      // Create log
+      await createLog(tx, userId, `Removed Payee: ${payeeToCheck.name}`);
+    });
+  } catch (error) {
+    console.log("Error in the removePayee controller: " + error.message);
+    return res.status(500).json({ message: "Internal server error." });
+  }
 };

@@ -15,10 +15,10 @@ export const protectRoute = async (req, res, next) => {
       return res.status(401).json({ message: "Unauthorized - invalid token." });
     }
 
-    //* Check if user exists
+    //* Check if user exists - use userId from token (not id)
     const user = await prisma.user.findUnique({
-      where: { id: decodedToken.id },
-      select: { id: true, role: true, name: true },
+      where: { id: decodedToken.userId },
+      select: { id: true, role: true, firstName: true, lastName: true, email: true, username: true },
     });
 
     if (!user) {

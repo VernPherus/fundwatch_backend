@@ -8,25 +8,27 @@ datasource db {
 }
 
 model Payee {
-  id            Int            @id @default(autoincrement())
+  id            Int       @id @default(autoincrement())
   name          String
-  address       String?        @map("address")
-  type          String?        @default("supplier")
-  tinNum        String?        @map("tin_number")
-  bankName      String?        @map("bank_name")
-  bankBranch    String?        @map("bank_branch")
-  accountName   String?        @map("account_name")
-  accountNumber String?        @map("account_number")
-  contactPerson String?        @map("contact_person")
-  mobileNum     String?        @map("mobile_number")
-  email         String?        @map("email")
-  isActive      Boolean        @default(true) @map("is_active")
-  remarks       String?        @db.Text
-  createdAt     DateTime       @default(now()) @map("created_at")
-  updatedAt     DateTime       @updatedAt @map("updated_at")
+  address       String?   @map("address")
+  type          String?   @default("supplier")
+  tinNum        String?   @map("tin_number")
+  bankName      String?   @map("bank_name")
+  bankBranch    String?   @map("bank_branch")
+  accountName   String?   @map("account_name")
+  accountNumber String?   @map("account_number")
+  contactPerson String?   @map("contact_person")
+  mobileNum     String?   @map("mobile_number")
+  email         String?   @map("email")
+  isActive      Boolean   @default(true) @map("is_active")
+  remarks       String?   @db.Text
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  deletedAt     DateTime? @map("deleted_at")
+
   disbursements Disbursement[]
 
-  @@map("payees")
+  @@map("tb_payees")
 }
 
 model FundSource {
@@ -37,10 +39,40 @@ model FundSource {
   description    String?
   isActive       Boolean        @default(true) @map("is_active")
   createdAt      DateTime       @default(now()) @map("created_at")
+  reset          Reset          @default(NONE)
   updatedAt      DateTime       @updatedAt @map("updated_at")
+  deletedAt      DateTime?      @map("deleted_at")
   disbursements  Disbursement[]
+  fundEntries    FundEntry[]
 
-  @@map("fund_sources")
+  @@map("tb_fund_sources")
+}
+
+model FundEntry {
+  id           Int       @id @default(autoincrement())
+  fundSourceId Int       @map("fund_source_id")
+  name         String
+  amount       Decimal   @default(0) @db.Decimal(15, 2)
+  createdAt    DateTime  @default(now()) @map("created_at")
+  deletedAt    DateTime? @map("deleted_at")
+
+  fundSource FundSource? @relation(fields: [fundSourceId], references: [id])
+
+  @@map("tb_fund_entry")
+}
+
+model References {
+  id           Int           @id @default(autoincrement())
+  disbId       Int           @map("disbursement_id")
+  acicNum      String        @map("acic_num")
+  orsNum       String        @map("ors_num")
+  dvNum        String        @map("dv_num")
+  uacsCode     String        @map("uacs_code")
+  respCode     String        @map("resp_code")
+  disbursement Disbursement? @relation(fields: [disbId], references: [id])
+
+  @@index([acicNum, orsNum, dvNum, uacsCode, respCode])
+  @@map("tb_references")
 }
 
 model Disbursement {
@@ -48,19 +80,16 @@ model Disbursement {
   payeeId         Int?                     @map("payee_id")
   fundSourceId    Int?                     @map("fund_source_id")
   lddapNum        String?                  @map("lddap_num")
-  acicNum         String?                  @map("acic_num")
-  orsNum          String?                  @map("ors_num")
-  dvNum           String?                  @map("dv_num")
-  uacsCode        String?                  @map("uacs_code")
-  respCode        String?                  @map("resp_code")
-  dateReceived    DateTime?                @map("date_received")
+  checkNum        String?                  @map("checkNum")
+  dateReceived    DateTime                 @map("date_received")
   dateEntered     DateTime                 @default(now()) @map("date_entered")
   grossAmount     Decimal                  @map("gross_amount") @db.Decimal(15, 2)
   totalDeductions Decimal                  @default(0) @map("total_deductions") @db.Decimal(15, 2)
   netAmount       Decimal                  @map("net_amount") @db.Decimal(15, 2)
   particulars     String?
-  method          Method                   @default(MANUAL)
-  status          String                   @default("pending")
+  method          Method?
+  lddapMthd       LddapMethod?
+  status          Status                   @default(PAID)
   approvedAt      DateTime?                @map("approved_at")
   createdAt       DateTime                 @default(now()) @map("created_at")
   updatedAt       DateTime                 @updatedAt @map("updated_at")
@@ -70,16 +99,10 @@ model Disbursement {
   items           DisbursementItem[]
   fundSource      FundSource?              @relation(fields: [fundSourceId], references: [id])
   payee           Payee?                   @relation(fields: [payeeId], references: [id])
+  references      References[]
 
-  @@index([lddapNum])
-  @@index([acicNum])
-  @@index([orsNum])
-  @@index([dvNum])
-  @@index([uacsCode])
-  @@index([respCode])
-  @@index([method])
-  @@index([status])
-  @@map("disbursements")
+  @@index([status, method, lddapNum])
+  @@map("tb_disbursements")
 }
 
 model DisbursementItem {
@@ -92,19 +115,31 @@ model DisbursementItem {
   updatedAt      DateTime      @updatedAt @map("updated_at")
   disbursement   Disbursement? @relation(fields: [disbursementId], references: [id])
 
-  @@map("disbursement_items")
+  @@map("tb_disbursement_items")
+}
+
+model OTP {
+  id        Int      @id @default(autoincrement())
+  email     String
+  otp       String
+  isUsed    Boolean  @default(false) @map("is_used")
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([email, otp])
+  @@map("tb_otp")
 }
 
 model DisbursementDeductions {
-  id            Int          @id @default(autoincrement())
-  disbursemenId Int          @map("disbursement_id")
-  deductionType String       @map("deduction_type")
-  amount        Decimal      @db.Decimal(15, 2)
-  createdAt     DateTime     @default(now()) @map("created_at")
-  updatedAt     DateTime     @updatedAt @map("updated_at")
-  disbursement  Disbursement @relation(fields: [disbursemenId], references: [id])
+  id             Int          @id @default(autoincrement())
+  disbursementId Int          @map("disbursement_id")
+  deductionType  String       @map("deduction_type")
+  amount         Decimal      @db.Decimal(15, 2)
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+  disbursement   Disbursement @relation(fields: [disbursementId], references: [id])
 
-  @@map("disbursement_deductions")
+  @@map("tb_disbursement_deductions")
 }
 
 model User {
@@ -119,7 +154,7 @@ model User {
   updatedAt DateTime @updatedAt @map("updated_at")
   logs      Logs[]
 
-  @@map("users")
+  @@map("tb_users")
 }
 
 model Logs {
@@ -130,7 +165,7 @@ model Logs {
   updatedAt DateTime @updatedAt @map("updated_at")
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@map("logs")
+  @@map("tb_logs")
 }
 
 enum Role {
@@ -140,6 +175,27 @@ enum Role {
 }
 
 enum Method {
+  LDDAP
+  CHECK
+}
+
+enum PayeeType {
+  SUPPLIER
+  EMPLOYEE
+}
+
+enum LddapMethod {
   ONLINE
   MANUAL
+}
+
+enum Status {
+  PAID
+  PENDING
+}
+
+enum Reset {
+  MONTHLY
+  YEARLY
+  NONE
 }

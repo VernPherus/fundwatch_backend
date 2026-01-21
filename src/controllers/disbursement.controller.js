@@ -1,5 +1,5 @@
 import { prisma } from "../lib/prisma.js";
-import { Role, Method, PayeeType, Status } from "../generated/prisma/enums.js";
+import { Role, Method, PayeeType, Status } from "../lib/constants.js";
 import { createLog } from "../lib/auditLogger.js";
 import { findActiveRecord } from "../lib/dbHelpter.js";
 

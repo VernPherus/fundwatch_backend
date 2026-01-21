@@ -8,22 +8,24 @@ datasource db {
 }
 
 model Payee {
-  id            Int            @id @default(autoincrement())
+  id            Int       @id @default(autoincrement())
   name          String
-  address       String?        @map("address")
-  type          String?        @default("supplier")
-  tinNum        String?        @map("tin_number")
-  bankName      String?        @map("bank_name")
-  bankBranch    String?        @map("bank_branch")
-  accountName   String?        @map("account_name")
-  accountNumber String?        @map("account_number")
-  contactPerson String?        @map("contact_person")
-  mobileNum     String?        @map("mobile_number")
-  email         String?        @map("email")
-  isActive      Boolean        @default(true) @map("is_active")
-  remarks       String?        @db.Text
-  createdAt     DateTime       @default(now()) @map("created_at")
-  updatedAt     DateTime       @updatedAt @map("updated_at")
+  address       String?   @map("address")
+  type          String?   @default("supplier")
+  tinNum        String?   @map("tin_number")
+  bankName      String?   @map("bank_name")
+  bankBranch    String?   @map("bank_branch")
+  accountName   String?   @map("account_name")
+  accountNumber String?   @map("account_number")
+  contactPerson String?   @map("contact_person")
+  mobileNum     String?   @map("mobile_number")
+  email         String?   @map("email")
+  isActive      Boolean   @default(true) @map("is_active")
+  remarks       String?   @db.Text
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+  deletedAt     DateTime? @map("deleted_at")
+
   disbursements Disbursement[]
 
   @@map("tb_payees")
@@ -39,6 +41,7 @@ model FundSource {
   createdAt      DateTime       @default(now()) @map("created_at")
   reset          Reset          @default(NONE)
   updatedAt      DateTime       @updatedAt @map("updated_at")
+  deletedAt      DateTime?      @map("deleted_at")
   disbursements  Disbursement[]
   fundEntries    FundEntry[]
 
@@ -46,12 +49,14 @@ model FundSource {
 }
 
 model FundEntry {
-  id           Int         @id @default(autoincrement())
-  fundSourceId Int         @map("fund_source_id")
+  id           Int       @id @default(autoincrement())
+  fundSourceId Int       @map("fund_source_id")
   name         String
-  amount       Decimal     @default(0) @db.Decimal(15, 2)
-  createdAt    DateTime    @default(now()) @map("created_at")
-  fundSource   FundSource? @relation(fields: [fundSourceId], references: [id])
+  amount       Decimal   @default(0) @db.Decimal(15, 2)
+  createdAt    DateTime  @default(now()) @map("created_at")
+  deletedAt    DateTime? @map("deleted_at")
+
+  fundSource FundSource? @relation(fields: [fundSourceId], references: [id])
 
   @@map("tb_fund_entry")
 }

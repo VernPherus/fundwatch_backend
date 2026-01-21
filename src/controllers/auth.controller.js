@@ -1,7 +1,7 @@
 import { prisma } from "../lib/prisma.js";
 import bcrypt from "bcryptjs";
 import { generateToken } from "../lib/utils.js";
-import { Role } from "../generated/prisma/enums.js";
+import { Role } from "../lib/constants.js";
 import { sentOtpEmail } from "../lib/mail.js";
 
 /**

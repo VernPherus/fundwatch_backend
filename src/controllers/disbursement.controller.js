@@ -1,11 +1,12 @@
 import { prisma } from "../lib/prisma.js";
 import { Role, Method, PayeeType, Status } from "../generated/prisma/enums.js";
 import { createLog } from "../lib/auditLogger.js";
+import { findActiveRecord } from "../lib/dbHelpter.js";
 
 /**
  * * STORE RECORD: Store disbursement, disbursement items, deductions and calculate funds
- * @param {*} req
- * @param {*} res
+ * @param {Object} req - Takes all disbursement data in req.body
+ * @param {Object} res - Returns the new disbursement
  * @returns
  */
 export const storeRec = async (req, res) => {
@@ -163,9 +164,11 @@ export const storeRec = async (req, res) => {
 /**
  * * DISPLAY RECORD: Display disbursement records for dashboard
  * Shows disbursement date received, payee, fund, net amount, and status
- * GET /api/disbursement/display?page=1&limit=10
- * @param {*} req
- * @param {*} res
+ * Sample:
+ * GET /api/disbursement/display?page=1&limit=10&search=acme&status=PENDING&startDate=2024-01-01
+ * TODO: Add socket.io realtime functionality
+ * @param {Object} req - Params for page and disbursement limit
+ * @param {Object} res - Returns 10 disbursement records in json format
  * @returns
  */
 export const displayRec = async (req, res) => {
@@ -173,12 +176,66 @@ export const displayRec = async (req, res) => {
   const limit = Number(req.query.limit) || 10;
   const skip = (page - 1) * limit;
 
-  try {
-    //* Get disbursement records
+  const { search, status, startDate, method, fundId, endDate } = req.query;
 
+  try {
+    // Build where
+    const where = {
+      deletedAt: null,
+    };
+
+    //* Filters
+    // Status Filter
+    if (status && status !== "all") {
+      where.status = status;
+    }
+
+    // Method Filter (Exact Match)
+    if (method && method !== "all") {
+      where.method = method;
+    }
+
+    // Fund Source Filter (ID Match)
+    if (fundId && fundId !== "all") {
+      where.fundSourceId = Number(fundId);
+    }
+
+    // Date Range Filter
+    if (startDate || endDate) {
+      where.dateReceived = {};
+      if (startDate) where.dateReceived.gte = new Date(startDate);
+      if (endDate) where.dateReceived.lte = new Date(endDate);
+    }
+
+    // Search
+    if (search) {
+      where.OR = [
+        // Search Payee Name
+        { payee: { name: { contains: search, mode: "insensitive" } } },
+        // Search Direct Documents
+        { lddapNum: { contains: search, mode: "insensitive" } },
+        { checkNum: { contains: search, mode: "insensitive" } },
+        // Search inside Related References (ORS/DV)
+        {
+          references: {
+            some: {
+              OR: [
+                { orsNum: { contains: search, mode: "insensitive" } },
+                { dvNum: { contains: search, mode: "insensitive" } },
+                { uacsCode: { contains: search, mode: "insensitive" } },
+              ],
+            },
+          },
+        },
+      ];
+    }
+
+    //*  Execute Query
     const [totalRecords, records] = await prisma.$transaction([
-      prisma.disbursement.count(),
+      prisma.disbursement.count({ where }),
+
       prisma.disbursement.findMany({
+        where,
         skip: skip,
         take: limit,
         orderBy: {
@@ -189,6 +246,7 @@ export const displayRec = async (req, res) => {
           dateReceived: true,
           netAmount: true,
           status: true,
+          method: true,
 
           payee: {
             select: {
@@ -200,6 +258,13 @@ export const displayRec = async (req, res) => {
               code: true,
               name: true,
             },
+          },
+          references: {
+            select: {
+              orsNum: true,
+              dvNum: true,
+            },
+            take: 1,
           },
         },
       }),
@@ -222,8 +287,8 @@ export const displayRec = async (req, res) => {
 
 /**
  * * SHOW RECORD: Show all data in one disbursement, accessed by view disbursement function in dashboard.
- * @param {*} req
- * @param {*} res
+ * @param {Object} req - Takes the disbursement id to display
+ * @param {Object} res - Returns all disbursement data
  * @returns
  */
 export const showRec = async (req, res) => {
@@ -244,6 +309,7 @@ export const showRec = async (req, res) => {
         items: true,
         deductions: true,
         payee: true,
+        references: true,
         fundSource: { select: { code: true, name: true, description: true } },
       },
     });
@@ -257,21 +323,6 @@ export const showRec = async (req, res) => {
   } catch (error) {
     console.log("Error in showRec controller: ", error.message);
     res.status(500).json({ message: "Internal server error." });
-  }
-};
-
-/**
- * * SEARCH RECORD: Search disbursement record
- * @param {*} req
- * @param {*} res
- */
-export const searchRec = async (req, res) => {
-  const { searchItem } = req.body;
-
-  try {
-  } catch (error) {
-    console.log("Error in searchRec controller: " + error.message);
-    return res.status(500).json({ message: "Internal server error." });
   }
 };
 
@@ -314,24 +365,23 @@ export const editRec = async (req, res) => {
     //* Validation
 
     // Initial fetch to validate status
-    const currentRecord = await prisma.disbursement.findUnique({
-      where: { id: Number(id) },
-      include: {
-        items: true,
-        deductions: true,
-        references: true,
-      },
+    const currentRecord = await findActiveRecord(id, {
+      items: true,
+      deductions: true,
+      references: true,
     });
 
     if (!currentRecord) {
-      return res.status(404).json({ message: "Disbursement not found." });
+      return res
+        .status(404)
+        .json({ message: "Disbursement not found or unavailable." });
     }
 
     //* Recalculations
     let newGross = Number(currentRecord.grossAmount);
     let newTotalDeductions = Number(currentRecord.totalDeductions);
-    let itemUpdateOp = undefined;
-    let deductionUpdateOp = undefined;
+    let itemsUpdateOp = undefined;
+    let deductionsUpdateOp = undefined;
 
     //* Handle Items update
     if (items && Array.isArray(items)) {
@@ -435,8 +485,8 @@ export const editRec = async (req, res) => {
 
 /**
  * * APPROVE RECORD
- * @param {*} req
- * @param {*} res
+ * @param {Object} req - Takes disbursement id to update
+ * @param {Object} res
  * @returns
  */
 export const approveRec = async (req, res) => {
@@ -470,7 +520,7 @@ export const approveRec = async (req, res) => {
 
     //* Use transaction with logging
     const result = await prisma.$transaction(async (tx) => {
-      //* 1. Update disbursement status
+      //* Update disbursement status
       const approvedRecord = await tx.disbursement.update({
         where: { id: Number(id) },
         data: {
@@ -485,7 +535,7 @@ export const approveRec = async (req, res) => {
         },
       });
 
-      //* 2. Create audit log
+      //* Create audit log
       if (userId) {
         const logMessage = `APPROVED Disbursement #${id} | Payee: ${record.payee?.name || "N/A"} | Fund: ${record.fundSource?.code || "N/A"} | Net Amount: ₱${Number(record.netAmount).toLocaleString("en-PH", { minimumFractionDigits: 2 })}${remarks ? ` | Remarks: ${remarks}` : ""}`;
 
@@ -512,11 +562,55 @@ export const approveRec = async (req, res) => {
 };
 
 /**
- * * REMOVE RECORD:
- * @param {*} req
- * @param {*} res
+ * * REMOVE RECORD: Soft deletes disbursement record entry
+ * Just adds a deletion date, when deletion date filled, disbursement will not be displayed.
+ * @param {Object} req - Takes disbursement id
+ * @param {Object} res - Returns action status
  * @returns
  */
 export const removeRec = async (req, res) => {
-  return res.status(200).json({ message: "Show  Disbursement" });
+  const { id } = req.params;
+  const userId = req.user?.id;
+
+  try {
+    // Validation
+    const recordToCheck = await prisma.disbursement.findUnique({
+      where: { id: Number(id) },
+      select: {
+        id: true,
+        deletedAt: true,
+        payee: { select: { name: true } },
+      },
+    });
+
+    if (!recordToCheck) {
+      return res.status(404).json({ message: "Disbursement Record not found" });
+    }
+
+    if (recordToCheck.deletedAt) {
+      return res.status(400).json({ message: "Record already deleted." });
+    }
+
+    // Perform soft deletion
+    const deleteRecord = await prisma.$transaction(async (tx) => {
+      const record = await tx.disbursement.update({
+        where: { id: Number(id) },
+        data: {
+          deletedAt: new Date(),
+        },
+      });
+
+      // Create log
+      const logDescription = `Deleted disbusrement #${id} (${recordToCheck.payee?.name || "Unknown Payee"})`;
+      await createLog(tx, userId, logDescription);
+    });
+
+    res.status(200).json({
+      message: "Disbursement record removed successfully.",
+      id: Number(id),
+    });
+  } catch (error) {
+    console.log("Error in removeRec controller: " + error.message);
+    return res.status(500).json({ message: "Internal server error." });
+  }
 };

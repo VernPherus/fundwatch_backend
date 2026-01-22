@@ -332,7 +332,7 @@ export const resetPassword = async (req, res) => {
 
     // Return
     res
-      .status(500)
+      .status(200)
       .json({ message: "Password update successful", updatedPassword });
   } catch (error) {
     console.log("Error in the resetPassword controller: " + error.message);

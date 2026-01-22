@@ -205,6 +205,15 @@ export const displayRec = async (req, res) => {
       where.dateReceived = {};
       if (startDate) where.dateReceived.gte = new Date(startDate);
       if (endDate) where.dateReceived.lte = new Date(endDate);
+    } else {
+      // DEFAULT: No dates provided -> Filter for Current Month
+      const startOfMonth = new Date();
+      startOfMonth.setDate(1);
+      startOfMonth.setHours(0, 0, 0, 0); // Start of the day (00:00:00)
+
+      where.dateReceived = {
+        gte: startOfMonth,
+      };
     }
 
     // Search

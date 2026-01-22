@@ -203,7 +203,7 @@ export const displayFundDashboard = async (req, res) => {
         0,
       );
       const initialBalance = Number(fund.initialBalance);
-      const remaining = initializeBalance - totalSpent;
+      const remaining = initialBalance - totalSpent;
 
       // Calculate percentage used
       const utilization =
@@ -222,7 +222,7 @@ export const displayFundDashboard = async (req, res) => {
       };
     });
 
-    const globalTotals = fundsStats.reduce(
+    const globalTotals = fundStats.reduce(
       (acc, curr) => ({
         totalBudget: acc.totalBudget + curr.initialBalance,
         totalSpent: acc.totalSpent + curr.totalSpent,
@@ -283,7 +283,7 @@ export const displayEntry = async (req, res) => {
       },
     });
   } catch (error) {
-    console.log("Error in the resetFund controller: " + error.message);
+    console.log("Error in the displayEntry controller: " + error.message);
     return res.status(500).json({ message: "Internal server error." });
   }
 };

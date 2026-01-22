@@ -85,7 +85,7 @@ export const newPayee = async (req, res) => {
  * @param {*} res
  * @returns
  */
-export const listPayee = async (res) => {
+export const listPayee = async (req, res) => {
   try {
     // Get payee:
     const payees = await prisma.payee.findMany();

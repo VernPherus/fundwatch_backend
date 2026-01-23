@@ -6,8 +6,8 @@ import { sentOtpEmail } from "../lib/mail.js";
 
 /**
  ** SIGNUP: Create a user and store into database
- * @param {*} req
- * @param {*} res
+ * @param {object} req
+ * @param {object} res
  */
 export const signup = async (req, res) => {
   const { username, firstName, lastName, email, password } = req.body;
@@ -332,7 +332,7 @@ export const resetPassword = async (req, res) => {
 
     // Return
     res
-      .status(500)
+      .status(200)
       .json({ message: "Password update successful", updatedPassword });
   } catch (error) {
     console.log("Error in the resetPassword controller: " + error.message);

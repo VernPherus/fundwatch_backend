@@ -1,5 +1,5 @@
 import { prisma } from "../lib/prisma.js";
-import { Role, Method, PayeeType, Status } from "../lib/constants.js";
+import { Status } from "../lib/constants.js";
 import { createLog } from "../lib/auditLogger.js";
 import { findActiveRecord } from "../lib/dbHelpter.js";
 
@@ -205,6 +205,15 @@ export const displayRec = async (req, res) => {
       where.dateReceived = {};
       if (startDate) where.dateReceived.gte = new Date(startDate);
       if (endDate) where.dateReceived.lte = new Date(endDate);
+    } else {
+      // DEFAULT: No dates provided -> Filter for Current Month
+      const startOfMonth = new Date();
+      startOfMonth.setDate(1);
+      startOfMonth.setHours(0, 0, 0, 0); // Start of the day (00:00:00)
+
+      where.dateReceived = {
+        gte: startOfMonth,
+      };
     }
 
     // Search
@@ -592,8 +601,8 @@ export const removeRec = async (req, res) => {
     }
 
     // Perform soft deletion
-    const deleteRecord = await prisma.$transaction(async (tx) => {
-      const record = await tx.disbursement.update({
+    await prisma.$transaction(async (tx) => {
+      await tx.disbursement.update({
         where: { id: Number(id) },
         data: {
           deletedAt: new Date(),

@@ -171,8 +171,8 @@ async function main() {
   // await prisma.disbursement.deleteMany({});
 
   const today = new Date();
-  const sixMonthsAgo = new Date();
-  sixMonthsAgo.setDate(today.getDate() - 180);
+  const thisMonth = new Date();
+  thisMonth.setDate(1);
 
   // --- LDDAP Method (10 Items) ---
   console.log("Generating 10 LDDAP Disbursements...");
@@ -180,7 +180,7 @@ async function main() {
   for (let i = 1; i <= 10; i++) {
     const randomFund = funds[getRandomInt(0, funds.length - 1)];
     const randomPayee = payees[getRandomInt(0, payees.length - 1)];
-    const randomDate = getRandomDate(sixMonthsAgo, today);
+    const randomDate = getRandomDate(thisMonth, today);
 
     // Financials
     const gross = getRandomInt(10000, 50000);
@@ -191,8 +191,7 @@ async function main() {
     const isOnline = i % 2 === 0;
     const lddapMethod = isOnline ? LddapMethod.ONLINE : LddapMethod.MANUAL;
 
-    // Variation: 70% Paid, 30% Pending
-    const isPaid = Math.random() > 0.3;
+    const isPaid = true;
     const status = isPaid ? Status.PAID : Status.PENDING;
 
     await prisma.disbursement.create({
@@ -255,13 +254,13 @@ async function main() {
   for (let i = 1; i <= 10; i++) {
     const randomFund = funds[getRandomInt(0, funds.length - 1)];
     const randomPayee = payees[getRandomInt(0, payees.length - 1)];
-    const randomDate = getRandomDate(sixMonthsAgo, today);
+    const randomDate = getRandomDate(thisMonth, today);
 
     const gross = getRandomInt(5000, 20000); // Checks often smaller amounts
     const tax = 0; // Simple example with no tax
     const net = gross;
 
-    const isPaid = Math.random() > 0.3;
+    const isPaid = true;
     const status = isPaid ? Status.PAID : Status.PENDING;
 
     await prisma.disbursement.create({

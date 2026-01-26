@@ -121,10 +121,17 @@ export const storeRec = async (req, res) => {
             })),
           },
           deductions: {
-            create: items.map((ded) => ({
-              deductionType: ded.deductionType,
-              amount: Number(ded.amount),
-            })),
+            create: deductions
+              .filter(
+                (ded) =>
+                  ded.deductionType != null &&
+                  String(ded.deductionType).trim() !== "" &&
+                  ded.amount != null,
+              )
+              .map((ded) => ({
+                deductionType: ded.deductionType.trim(),
+                amount: Number(ded.amount),
+              })),
           },
           references: {
             create: {
@@ -359,7 +366,12 @@ export const editRec = async (req, res) => {
     dateReceived,
     ageLimit,
 
+    //* Status / approval
+    status,
+    approvedAt,
+
     //* References
+    acicNum,
     orsNum,
     dvNum,
     uacsCode,
@@ -409,15 +421,21 @@ export const editRec = async (req, res) => {
 
     //* Handle deductions update
     if (deductions && Array.isArray(deductions)) {
-      newTotalDeductions = deductions.reduce(
+      const validDeductions = deductions.filter(
+        (ded) =>
+          ded.deductionType != null &&
+          String(ded.deductionType).trim() !== "" &&
+          ded.amount != null,
+      );
+      newTotalDeductions = validDeductions.reduce(
         (sum, ded) => sum + Number(ded.amount || 0),
         0,
       );
 
       deductionsUpdateOp = {
         deleteMany: {},
-        create: deductions.map((ded) => ({
-          deductionType: ded.deductionType,
+        create: validDeductions.map((ded) => ({
+          deductionType: ded.deductionType.trim(),
           amount: Number(ded.amount),
         })),
       };
@@ -440,8 +458,14 @@ export const editRec = async (req, res) => {
           particulars,
           method,
           lddapMthd: lddapMethod,
-          ageLimit: ageLimit ? Number(ageLimit) : undefined,
+          ageLimit: ageLimit != null && ageLimit !== "" ? Number(ageLimit) : undefined,
           dateReceived: dateReceived ? new Date(dateReceived) : undefined,
+
+          // Status / approval
+          ...(status != null && { status }),
+          ...(approvedAt != null && {
+            approvedAt: approvedAt ? new Date(approvedAt) : null,
+          }),
 
           // Financials
           grossAmount: newGross,
@@ -469,6 +493,7 @@ export const editRec = async (req, res) => {
           deductions: true,
           references: true,
           payee: true,
+          fundSource: true,
         },
       });
 
@@ -483,6 +508,8 @@ export const editRec = async (req, res) => {
         userId,
         `Edited disbursement #${record.id} - ${record.payee?.name} ${financialNote}`,
       );
+
+      return record;
     });
 
     res.status(200).json(updatedRecord);

@@ -104,11 +104,11 @@ export const listPayee = async (req, res) => {
  * @returns
  */
 export const showPayee = async (req, res) => {
-  const { id: payeeID } = req.params;
+  const { id } = req.params;
   try {
     const payee = await prisma.payee.findUnique({
       where: {
-        id: payeeID,
+        id: Number(id),
       },
     });
 

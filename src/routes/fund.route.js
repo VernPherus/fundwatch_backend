@@ -28,7 +28,7 @@ router.get(
   displayFund,
 );
 router.get(
-  "/showfund",
+  "/showfund/:id",
   protectRoute,
   authorize(["USER", "STAFF", "ADMIN"]),
   showFund,
@@ -60,6 +60,6 @@ router.put(
   authorize(["STAFF", "ADMIN"]),
   deactivateFund,
 );
-router.put("/deleteEntry", authorize(["STAFF", "AUTHORIZE"], deleteEntry));
+router.put("/deleteEntry/:id", authorize(["STAFF", "AUTHORIZE"], deleteEntry));
 
 export default router;

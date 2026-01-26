@@ -8,6 +8,11 @@ const router = express.Router();
  * * LOG ROUTES
  */
 
-router.get("/", protectRoute, authorize(["ADMIN"]), getSystemLogs);
+router.get(
+  "/",
+  protectRoute,
+  authorize(["ADMIN"]),
+  getSystemLogs,
+);
 
 export default router;

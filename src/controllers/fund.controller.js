@@ -86,7 +86,7 @@ export const newEntry = async (req, res) => {
       // Create entry
       const entry = await tx.fundEntry.create({
         data: {
-          fundSource: Number(sourceId),
+          fundSourceId: Number(sourceId),
           name: name,
           amount: Number(amount),
         },

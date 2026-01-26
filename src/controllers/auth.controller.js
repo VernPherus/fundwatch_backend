@@ -59,14 +59,9 @@ export const signup = async (req, res) => {
     });
 
     if (result) {
-      generateToken(result.id, res);
-
       res.status(201).json({
-        id: result.id,
+        message: "New user created",
         username: result.username,
-        firstName: result.firstName,
-        lastName: result.lastName,
-        email: result.email,
       });
     }
   } catch (error) {
@@ -156,7 +151,13 @@ export const login = async (req, res) => {
  */
 export const logout = (req, res) => {
   try {
-    res.cookie("jwt", "", { maxAge: 0 });
+    const isDev = process.env.NODE_ENV !== "production";
+    res.cookie("jwt", "", {
+      maxAge: 0,
+      httpOnly: true,
+      sameSite: isDev ? "lax" : "strict",
+      secure: !isDev,
+    });
     res.status(200).json({ message: "Logged out successfully" });
   } catch (error) {
     console.log("Error in the logout controller: ", error.message);

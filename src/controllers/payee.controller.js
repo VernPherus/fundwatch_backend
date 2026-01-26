@@ -171,36 +171,33 @@ export const editPayee = async (req, res) => {
       }
     }
 
+    // Only include defined fields so we don't overwrite e.g. mobileNum with undefined
+    const updateData = {};
+    if (name !== undefined) updateData.name = name;
+    if (address !== undefined) updateData.address = address;
+    if (type !== undefined) updateData.type = type;
+    if (tinNum !== undefined) updateData.tinNum = tinNum;
+    if (bankName !== undefined) updateData.bankName = bankName;
+    if (bankBranch !== undefined) updateData.bankBranch = bankBranch;
+    if (accountName !== undefined) updateData.accountName = accountName;
+    if (accountNumber !== undefined) updateData.accountNumber = accountNumber;
+    if (contactPerson !== undefined) updateData.contactPerson = contactPerson;
+    if (mobileNum !== undefined) updateData.mobileNum = mobileNum;
+    if (email !== undefined) updateData.email = email;
+    if (remarks !== undefined) updateData.remarks = remarks;
+    if (isActive !== undefined) updateData.isActive = isActive;
+
     // Transaction
     const updatedPayee = await prisma.$transaction(async (tx) => {
-      // Update
       const payee = await tx.payee.update({
-        where: {
-          id: Number(id),
-        },
-        data: {
-          name,
-          address,
-          type,
-          tinNum,
-          bankName,
-          bankBranch,
-          accountName,
-          accountNumber,
-          contactPerson,
-          mobileNumber: mobileNum,
-          email,
-          remarks,
-          isActive,
-        },
+        where: { id: Number(id) },
+        data: updateData,
       });
 
-      // Create log
       const statusNote =
         isActive !== undefined && isActive !== currentPayee.isActive
           ? ` (Status changed to ${isActive ? "Active" : "Inactive"})`
           : "";
-
       const nameNote =
         name && name !== currentPayee.name
           ? ` (Renamed from ${currentPayee.name})`
@@ -211,6 +208,8 @@ export const editPayee = async (req, res) => {
         userId,
         `Updated Payee: ${payee.name}${nameNote}${statusNote}`,
       );
+
+      return payee;
     });
 
     res.status(200).json({ updatedPayee });

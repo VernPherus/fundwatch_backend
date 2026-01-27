@@ -2,6 +2,22 @@ import { prisma } from "../lib/prisma.js";
 import { Status } from "../lib/constants.js";
 import { createLog } from "../lib/auditLogger.js";
 import { findActiveRecord } from "../lib/dbHelpter.js";
+import { genLDDAPCode } from "../lib/codeGenerator.js";
+
+/**
+ * * GENERATE LDDAP CODE: Generates LDDAP code for lddap entries
+ * @returns generated LDDAP code
+ */
+export const generateLDDAPCode = async (req, res) => {
+  try {
+    const lddapCode = await genLDDAPCode();
+
+    res.status(200).json({ lddapCode });
+  } catch (error) {
+    console.log("Error in the genLDDAPCode controller: " + error);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+};
 
 /**
  * * STORE RECORD: Store disbursement, disbursement items, deductions and calculate funds
@@ -458,7 +474,8 @@ export const editRec = async (req, res) => {
           particulars,
           method,
           lddapMthd: lddapMethod,
-          ageLimit: ageLimit != null && ageLimit !== "" ? Number(ageLimit) : undefined,
+          ageLimit:
+            ageLimit != null && ageLimit !== "" ? Number(ageLimit) : undefined,
           dateReceived: dateReceived ? new Date(dateReceived) : undefined,
 
           // Status / approval

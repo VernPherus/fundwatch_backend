@@ -27,5 +27,6 @@ export const Status = {
 export const Reset = {
   MONTHLY: "MONTHLY",
   YEARLY: "YEARLY",
+  QUARTERLY: "QUARTERLY",
   NONE: "NONE",
 };

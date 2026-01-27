@@ -198,5 +198,6 @@ enum Status {
 enum Reset {
   MONTHLY
   YEARLY
+  QUARTERLY
   NONE
 }

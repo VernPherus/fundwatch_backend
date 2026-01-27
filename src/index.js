@@ -10,9 +10,9 @@ import disbursementRoutes from "./routes/disbursement.route.js";
 import logRoutes from "./routes/log.route.js";
 import reportRoutes from "./routes/report.route.js";
 
-dotenv.config();
+import { app, server } from "./lib/socket.js";
 
-const app = express();
+dotenv.config();
 
 //* PORT
 const PORT = process.env.PORT;
@@ -24,7 +24,7 @@ app.use(
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
-  })
+  }),
 );
 
 //* APPLICATION STARTUP PROCESS
@@ -40,6 +40,6 @@ app.use("/api/disbursement", disbursementRoutes);
 app.use("/api/logs", logRoutes);
 app.use("/api/reports", reportRoutes);
 
-app.listen(PORT, () => {
+server.listen(PORT, () => {
   console.log("server is running on port: " + PORT);
 });

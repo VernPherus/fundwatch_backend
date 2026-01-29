@@ -1,4 +1,5 @@
 import { prisma } from "../lib/prisma.js";
+import { getSystemTimeDetails } from "./time.js";
 
 /**
  * Fund and financial calculation helpers.
@@ -71,4 +72,43 @@ export const calculateDeductions = (deductions) => {
   return deductions.reduce((sum, ded) => {
     return sum + Number(ded.amount || 0);
   }, 0);
+};
+
+/**
+ * TOTAL NCA - gets all nca entries, including the initial amount of the fund
+ * @param {Array} entries
+ * @returns
+ */
+export const totalNCA = (entries) => {
+  if (!Array.isArray(entries)) return 0;
+
+  return entries.reduce((sum, entry) => {
+    return sum + Number(entry.amount || 0);
+  }, 0);
+};
+
+/**
+ * TOTAL DISBURSEMENTS: gets the net amount of all disbursements within the month and returns the total
+ * @param {*} month
+ */
+export const totalDisb = async (month) => {
+  const disbursements = await prisma.disbursement.findMany({
+    where: { createdAt: "" },
+  });
+};
+
+/**
+ *
+ * @param {*} month
+ */
+export const totalMonthBalance = (month) => {
+  return totalNCA(month) - totalDisb(month);
+};
+
+/**
+ *
+ * @returns
+ */
+export const cashUtilization = (month) => {
+  return (totalNCA(month) / totalDisb(month)) * 100;
 };

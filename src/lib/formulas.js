@@ -37,11 +37,38 @@ export function utilizationRate(totalSpent, initialBalance) {
   return (Number(totalSpent ?? 0) / init) * 100;
 }
 
-export const grandTotal = async () => {
+/**
+ * GRAND TOTAL
+ * @param {Array} disbursements
+ * @returns
+ */
+export const grandTotal = async (disbursements) => {
+  //Calculate grand total from all disbursement net amounts
 
+  return ""; //grand total
+};
 
-    
-    //Calculate grand total from all disbursement net amounts
-    
-    return "" //grand total
-}
+/**
+ * CALCLUTAED GROSS
+ * @param {Array} items
+ */
+export const calculateGross = (items) => {
+  if (!Array.isArray(items)) return 0;
+
+  return items.reduce((sum, item) => {
+    return sum + Number(item.amount || 0);
+  }, 0);
+};
+
+/**
+ * CALCULATE DEDUCTIONS
+ * @param {Array} deductions
+ * @returns
+ */
+export const calculateDeductions = (deductions) => {
+  if (!Array.isArray(deductions)) return 0;
+
+  return items.reduce((sum, ded) => {
+    return (sum + Number(ded.amount || 0), 0);
+  });
+};

@@ -3,6 +3,7 @@ import { Status } from "../lib/constants.js";
 import { createLog } from "../lib/auditLogger.js";
 import { findActiveRecord } from "../lib/dbHelpter.js";
 import { genLDDAPCode } from "../lib/codeGenerator.js";
+import { calculateGross, calculateDeductions } from "../lib/formulas.js";
 
 /**
  * * GENERATE LDDAP CODE: Generates LDDAP code for lddap entries
@@ -91,14 +92,10 @@ export const storeRec = async (req, res) => {
 
     //* Calculations
     // Sum up items for Gross Amount
-    const calculatedGross = items.reduce((sum, item) => {
-      return sum + Number(item.amount || 0);
-    }, 0);
+    const calculatedGross = calculateGross(items);
 
     // Sum up deductions
-    const calculatedDeductions = deductions.reduce((sum, ded) => {
-      return sum + Number(ded.amount || 0);
-    }, 0);
+    const calculatedDeductions = calculateDeductions(deductions);
 
     // Calculate net amount
     const calculatedNet = calculatedGross - calculatedDeductions;

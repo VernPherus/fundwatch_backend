@@ -68,7 +68,7 @@ export const calculateGross = (items) => {
 export const calculateDeductions = (deductions) => {
   if (!Array.isArray(deductions)) return 0;
 
-  return items.reduce((sum, ded) => {
-    return (sum + Number(ded.amount || 0), 0);
-  });
+  return deductions.reduce((sum, ded) => {
+    return sum + Number(ded.amount || 0);
+  }, 0);
 };

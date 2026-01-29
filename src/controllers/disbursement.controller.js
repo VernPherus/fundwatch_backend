@@ -173,6 +173,8 @@ export const storeRec = async (req, res) => {
         userId,
         `Created disbursement ${refId} for ${record.payee?.name} (Net: ${record.netAmount})`,
       );
+
+      return record;
     });
 
     //* Socket.io implementation
@@ -280,6 +282,8 @@ export const displayRec = async (req, res) => {
           netAmount: true,
           status: true,
           method: true,
+          lddapNum: true,
+          checkNum: true,
 
           payee: {
             select: {
@@ -531,7 +535,7 @@ export const editRec = async (req, res) => {
     });
 
     // Socket.io
-    io.emit("disbusrement_updates", { type: "UPDATE", data: updateRecord });
+    io.emit("disbusrement_updates", { type: "UPDATE", data: updatedRecord });
 
     res.status(200).json(updatedRecord);
   } catch (error) {
@@ -666,7 +670,7 @@ export const removeRec = async (req, res) => {
     });
 
     // Socket.io
-    io.emit("disbursement_updates", {type: "UPDATE", })
+    io.emit("disbursement_updates", { type: "UPDATE" });
 
     res.status(200).json({
       message: "Disbursement record removed successfully.",

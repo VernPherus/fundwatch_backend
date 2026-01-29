@@ -191,10 +191,10 @@ export const displayFundStats = async (req, res) => {
       return res.status(400).json({ message: "All fields required" });
     }
 
-    const totalEntries = totalEntries(fundId, month);
+    const totalEntries = totalNCA(fundId, month);
     const totalDisbursement = totalDisb(fundId, month);
-    const totalMonthly = totalMonthly(fundId, month);
-    const totalCashUtil = totalCashUtil(fundId, month);
+    const totalMonthly = totalMonthBalance(fundId, month);
+    const totalCashUtil = cashUtilization(fundId, month);
 
     res.status(200).json({
       totalEntries,
